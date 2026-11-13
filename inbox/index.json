@@ -2,6 +2,16 @@
  "version": 1,
  "items": [
   {
+   "id": "20261114-0217-sigara-icen-robot",
+   "title": "Sigara içen robot",
+   "file": "inbox/cizimler/20261114-0217-sigara-icen-robot.json",
+   "rev": "1ee708d15d",
+   "w": 32,
+   "h": 16,
+   "frames": 12,
+   "created": "2026-11-14T02:17:00+03:00"
+  },
+  {
    "id": "20261114-0215-yun-yumakli-kedi",
    "title": "Yün yumaklı kedi",
    "file": "inbox/cizimler/20261114-0215-yun-yumakli-kedi.json",
