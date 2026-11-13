@@ -2,6 +2,16 @@
  "version": 1,
  "items": [
   {
+   "id": "20261114-0212-chibi-kiz",
+   "title": "Chibi kız",
+   "file": "inbox/cizimler/20261114-0212-chibi-kiz.json",
+   "rev": "33a71f48ab",
+   "w": 16,
+   "h": 16,
+   "frames": 2,
+   "created": "2026-11-14T02:12:00+03:00"
+  },
+  {
    "id": "20261114-0210-donen-pizza",
    "title": "Dönen pizza",
    "file": "inbox/cizimler/20261114-0210-donen-pizza.json",

@@ -1,0 +1,60 @@
+{
+ "title": "Chibi kız",
+ "created": "2026-11-14T02:12:00+03:00",
+ "w": 16,
+ "h": 16,
+ "palette": {
+  "H": "#ff5aa8",
+  "h": "#c0206e",
+  "R": "#ffe23a",
+  "S": "#ffc08a",
+  "E": "#2e7dff",
+  "W": "#ffffff",
+  "B": "#ff6a7a",
+  "M": "#ff2a2a",
+  "D": "#8f5cff"
+ },
+ "frames": [
+  [
+   "....RhHHHHhR....",
+   "...hHHHHHHHHh...",
+   "..hHHHHHHHHHHh..",
+   ".hHHhHHHHHHhHHh.",
+   "HhHhSSHHHHSShHhH",
+   "HhHSEWSSSSEWSHhH",
+   "HhHSEESSSSEESHhH",
+   "HhHSEESSSSEESHhH",
+   "HhHSBSSSSSSBSHhH",
+   ".hHHSSSMMSSSHHh.",
+   "..h.HSSSSSSH.h..",
+   "..h...WSSW...h..",
+   "..h..DDRRDD..h..",
+   ".h..SDDDDDDS..h.",
+   "....DDDDDDDD....",
+   ".....SS..SS....."
+  ],
+  [
+   "....RhHHHHhR....",
+   "...hHHHHHHHHh...",
+   "..hHHHHHHHHHHh..",
+   ".hHHhHHHHHHhHHh.",
+   "HhHhSSHHHHSShHhH",
+   "HhHSSSSSSSSSSHhH",
+   "HhHSSSSSSSSSSHhH",
+   "HhHSEESSSSEESHhH",
+   "HhHSBSSSSSSBSHhH",
+   ".hHHSSSMMSSSHHh.",
+   "..h.HSSSSSSH.h..",
+   "..h...WSSW...h..",
+   "..h..DDRRDD..h..",
+   ".h..SDDDDDDS..h.",
+   "....DDDDDDDD....",
+   ".....SS..SS....."
+  ]
+ ],
+ "delays": [
+  2200,
+  160
+ ],
+ "note": "Pembe ikiz örgülü, göz kırpan chibi kız"
+}
