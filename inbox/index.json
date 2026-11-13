@@ -2,6 +2,16 @@
  "version": 1,
  "items": [
   {
+   "id": "20261114-0214-kuru-kafa",
+   "title": "Kuru kafa ve yarasalar",
+   "file": "inbox/cizimler/20261114-0214-kuru-kafa.json",
+   "rev": "988af4fe20",
+   "w": 32,
+   "h": 16,
+   "frames": 8,
+   "created": "2026-11-14T02:14:00+03:00"
+  },
+  {
    "id": "20261114-0212-chibi-kiz",
    "title": "Chibi kız",
    "file": "inbox/cizimler/20261114-0212-chibi-kiz.json",
