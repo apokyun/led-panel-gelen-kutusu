@@ -2,6 +2,16 @@
  "version": 1,
  "items": [
   {
+   "id": "20261114-0252-sihirli-kiz",
+   "title": "Sihirli kız dönüşümü (256 kare)",
+   "file": "inbox/cizimler/20261114-0252-sihirli-kiz.json",
+   "rev": "5b78907ffc",
+   "w": 32,
+   "h": 16,
+   "frames": 256,
+   "created": "2026-11-14T02:52:00+03:00"
+  },
+  {
    "id": "20261114-0247-copadam-dovusu-256",
    "title": "Çöp adam dövüşü (256 kare)",
    "file": "inbox/cizimler/20261114-0247-copadam-dovusu-256.json",
