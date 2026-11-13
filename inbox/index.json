@@ -2,6 +2,16 @@
  "version": 1,
  "items": [
   {
+   "id": "20261114-0247-copadam-dovusu-256",
+   "title": "Çöp adam dövüşü (256 kare)",
+   "file": "inbox/cizimler/20261114-0247-copadam-dovusu-256.json",
+   "rev": "7d556e60d4",
+   "w": 32,
+   "h": 16,
+   "frames": 256,
+   "created": "2026-11-14T02:47:00+03:00"
+  },
+  {
    "id": "20261114-0243-bir-gun",
    "title": "Bir gün (256 kare)",
    "file": "inbox/cizimler/20261114-0243-bir-gun.json",
