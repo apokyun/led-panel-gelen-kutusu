@@ -2,6 +2,16 @@
  "version": 1,
  "items": [
   {
+   "id": "20261114-0210-donen-pizza",
+   "title": "Dönen pizza",
+   "file": "inbox/cizimler/20261114-0210-donen-pizza.json",
+   "rev": "f6bf594256",
+   "w": 16,
+   "h": 16,
+   "frames": 16,
+   "created": "2026-11-14T02:10:00+03:00"
+  },
+  {
    "id": "20261114-0202-manzara",
    "title": "Dağ ve güneş",
    "file": "inbox/cizimler/20261114-0202-manzara.json",
