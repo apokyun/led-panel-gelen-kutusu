@@ -1,0 +1,55 @@
+{
+ "title": "Atan kalp",
+ "created": "2026-11-14T02:00:00+03:00",
+ "w": 16,
+ "h": 16,
+ "palette": {
+  "R": "#ff2a3c",
+  "D": "#a0101e",
+  "P": "#ff9aa8",
+  "W": "#ffffff"
+ },
+ "frames": [
+  [
+   "................",
+   "..RRRR....RRRR..",
+   ".RRWPRR..RRRRRD.",
+   "RRWPRRRRRRRRRRDD",
+   "RRPRRRRRRRRRRRDD",
+   "RRRRRRRRRRRRRRDD",
+   "RRRRRRRRRRRRRRDD",
+   ".RRRRRRRRRRRRDD.",
+   "..RRRRRRRRRRDD..",
+   "...RRRRRRRRDD...",
+   "....RRRRRRDD....",
+   ".....RRRRDD.....",
+   "......RRDD......",
+   ".......RD.......",
+   "................",
+   "................"
+  ],
+  [
+   "................",
+   "................",
+   "................",
+   "...RRR....RRR...",
+   "..RWPRR..RRRRD..",
+   "..RPRRRRRRRRRD..",
+   "..RRRRRRRRRRRD..",
+   "...RRRRRRRRRD...",
+   "....RRRRRRRD....",
+   ".....RRRRRD.....",
+   "......RRRD......",
+   ".......RD.......",
+   "................",
+   "................",
+   "................",
+   "................"
+  ]
+ ],
+ "delays": [
+  500,
+  250
+ ],
+ "note": "Örnek: iki karelik atan kalp"
+}

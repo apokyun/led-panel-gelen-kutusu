@@ -1,0 +1,37 @@
+{
+ "title": "Dağ ve güneş",
+ "created": "2026-11-14T02:02:00+03:00",
+ "w": 32,
+ "h": 16,
+ "palette": {
+  "B": "#0b2a6e",
+  "b": "#1b4fa8",
+  "S": "#ffe14a",
+  "O": "#ff8a1e",
+  "W": "#ffffff",
+  "M": "#5a6c8c",
+  "G": "#2fbf4a",
+  "D": "#178a30"
+ },
+ "frames": [
+  [
+   "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+   "BBBBBBBBBBBBBBBBBBBBBBBOOOBBBBBB",
+   "BBBBBBBBBBBBBBBBBBBBBBOSSSOBBBBB",
+   "BBBBBBBBBBBBBBBBBBBBBOSSSSSOBBBB",
+   "BBBBBBBBBWBBBBBBBBBBBOSSSSSOBBBB",
+   "BBBBBBBBWWWBBBBBBBBBBOSSSSSOBBBB",
+   "bbbbbbbMMMMMbbbbbbbbbbOSSSObbbbb",
+   "bbbbbbMMMMMMMbbbbbWbbbbOOObbbbbb",
+   "bbbbbMMMMMMMMMbbbWWWbbbbbbbbbbbb",
+   "bbbbMMMMMMMMMMMbMMMMMbbbbbbbbbbb",
+   "...MMMMMMMMMMMMMMMMMMM..........",
+   "..MMMMMMMMMMMMMMMMMMMMM.........",
+   ".MMMMMMMMMMMMMMMMMMMMMMM........",
+   "GGDGGDGGDGGDGGDGGDGGDGGDGGDGGDGG",
+   "GDGGDGGDGGDGGDGGDGGDGGDGGDGGDGGD",
+   "DGGDGGDGGDGGDGGDGGDGGDGGDGGDGGDG"
+  ]
+ ],
+ "note": "Örnek: 32x16 tek kare"
+}

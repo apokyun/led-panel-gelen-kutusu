@@ -1,0 +1,2380 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>LED Panel Atölyesi</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: tek sütun, telefon önce. Üstte bağlantı, ortada LED önizleme, altta uygulama sekmeleri ve kontroller. */
+:root{
+  --bg:#eceff2; --surface:#ffffff; --ink:#151a20; --muted:#5b6672; --line:#d4dae0;
+  --accent:#2457d6; --accent-ink:#ffffff; --chip:#e2e7ec; --ok:#17803d; --bad:#c23a2b;
+  --bed:#080b0f;
+  --f-head:"Space Grotesk",system-ui,sans-serif; --f-body:"Inter",system-ui,sans-serif; --f-mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1216; --surface:#161c22; --ink:#e8edf2; --muted:#8c98a5; --line:#28313a;
+    --accent:#7ea0ff; --accent-ink:#0b1020; --chip:#1f2730; --ok:#4cc77a; --bad:#ff8272; --bed:#05070a;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1216; --surface:#161c22; --ink:#e8edf2; --muted:#8c98a5; --line:#28313a;
+  --accent:#7ea0ff; --accent-ink:#0b1020; --chip:#1f2730; --ok:#4cc77a; --bad:#ff8272; --bed:#05070a;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;
+  padding-block:16px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-family:var(--f-head);font-size:26px;line-height:1.1;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{margin:4px 0 0;color:var(--muted);font-size:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.status{display:flex;align-items:center;gap:10px;min-width:0}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:none}
+.dot.on{background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 25%,transparent)}
+.dot.bad{background:var(--bad)}
+#statusText{font-family:var(--f-mono);font-size:13px;overflow-wrap:anywhere}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible,canvas:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.primary{background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:11px 18px;font-weight:600;min-height:44px}
+.link{background:none;border:0;color:var(--accent);padding:6px 0;font-size:13px;text-decoration:underline;text-underline-offset:3px;text-align:left}
+.field{display:flex;flex-direction:column;gap:4px;flex:1 1 150px;min-width:0}
+#ctl-clock .field,#ctl-test .field,#ctl-lib .field,#ctl-inbox .field{flex:0 0 auto}
+.logbox{width:100%;box-sizing:border-box;height:220px;font:12px/1.4 var(--f-mono,'JetBrains Mono',monospace);background:var(--chip);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px;resize:vertical}
+.chip.full{border-color:var(--line)}
+.cap{font-size:14px;font-weight:600;color:var(--accent);margin:0;min-height:20px}
+.field label{font-size:12px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+select,input[type=text]{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:40px;width:100%}
+input[type=range]{width:100%;accent-color:var(--accent);min-height:32px}
+.bed{background:var(--bed);border-radius:12px;padding:12px;display:flex;justify-content:center;border:1px solid var(--line)}
+canvas{display:block;max-width:100%;max-height:44vh;width:auto;height:auto;touch-action:none;border-radius:4px}
+.readout{display:flex;justify-content:space-between;gap:10px;font-family:var(--f-mono);font-size:12px;color:var(--muted);flex-wrap:wrap}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.tab{background:var(--chip);border:1px solid transparent;border-radius:999px;padding:8px 14px;white-space:nowrap;font-weight:500;min-height:40px}
+.tab[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+.tab:disabled{opacity:.4;cursor:not-allowed}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--chip);border:1px solid transparent;border-radius:8px;padding:8px 12px;min-height:40px}
+.chip[aria-pressed=true]{border-color:var(--accent);color:var(--accent);font-weight:600}
+.pad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(2,56px);gap:8px;justify-content:center}
+.pad button{background:var(--chip);border:1px solid var(--line);border-radius:10px;font-size:22px;touch-action:none;user-select:none}
+.pad button:active{background:var(--accent);color:var(--accent-ink)}
+.pad{grid-auto-columns:64px}
+.pad .a{grid-column:4;grid-row:1 / span 2;border-radius:50%;font-family:var(--f-head);font-weight:700;font-size:24px;margin-left:8px}
+.pad .u{grid-column:2;grid-row:1}.pad .l{grid-column:1;grid-row:2}.pad .d{grid-column:2;grid-row:2}.pad .r{grid-column:3;grid-row:2}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.sw{width:40px;height:40px;border-radius:8px;border:2px solid var(--line);padding:0}
+.sw[aria-pressed=true]{border-color:var(--ink);box-shadow:0 0 0 2px var(--surface) inset}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.warn{font-size:13px;color:var(--bad);margin:0}
+[hidden]{display:none!important}
+body{background-image:radial-gradient(1200px 500px at 50% -10%,color-mix(in srgb,var(--accent) 14%,transparent),transparent 70%)}
+.brand{display:flex;align-items:center;gap:12px}
+.mark{display:grid;grid-template-columns:repeat(4,7px);grid-template-rows:repeat(3,7px);gap:3px;flex:none;padding:8px;background:var(--bed);border-radius:10px;border:1px solid var(--line)}
+.mark i{border-radius:50%;background:#1b2530;display:block}
+.mark i.c{background:#46f0ff;box-shadow:0 0 6px #46f0ff}.mark i.m{background:#ff3cc8;box-shadow:0 0 6px #ff3cc8}.mark i.g{background:#aaff3c;box-shadow:0 0 6px #aaff3c}
+.card{border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 8px 24px -16px rgba(0,0,0,.25)}
+.bed{border-radius:16px;box-shadow:0 0 0 1px var(--line),0 0 28px -8px color-mix(in srgb,var(--accent) 45%,transparent)}
+.ttl{font-family:var(--f-head);font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px}
+.ttl::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--accent)}
+.cats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:var(--chip);padding:4px;border-radius:14px}
+.cat{background:none;border:0;border-radius:11px;padding:9px 4px;min-height:44px;font-family:var(--f-head);font-weight:700;font-size:13px;color:var(--muted);line-height:1.15;text-wrap:balance}
+.cat[aria-pressed=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.tabs{padding:2px 0 4px}
+.tab{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.tab[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.rec{background:none;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:inherit;color:var(--ink);min-height:32px}
+.rec::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:#e5484d;margin-right:7px;vertical-align:baseline}
+.rec.on{border-color:#e5484d;color:#e5484d}
+.slots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.slot{position:relative;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:0;overflow:hidden;display:flex;flex-direction:column;text-align:left;min-width:0}
+.slot img,.slot .ph{width:100%;aspect-ratio:2/1;display:block;background:#000;image-rendering:pixelated;object-fit:contain}
+.slot .ph{display:grid;place-items:center;color:var(--muted);font-size:12px;background:repeating-linear-gradient(45deg,transparent 0 6px,color-mix(in srgb,var(--muted) 12%,transparent) 6px 7px)}
+.slot .nb{position:absolute;top:5px;left:5px;font:600 11px var(--f-mono);background:rgba(0,0,0,.7);color:#fff;border-radius:6px;padding:1px 7px}
+.slot .lb{font-size:11px;padding:5px 7px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.sub2{margin:0;font-size:12px;color:var(--muted)}
+.badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:#e5484d;color:#fff;font:600 11px var(--f-mono);vertical-align:1px}
+.slot .new{position:absolute;top:5px;right:5px;font:700 10px var(--f-mono);background:#e5484d;color:#fff;border-radius:6px;padding:1px 6px;letter-spacing:.04em}
+#inboxStatus{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin:0;overflow-wrap:anywhere}
+#inboxStatus.bad{color:var(--bad)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<main class="wrap">
+  <header class="brand">
+    <div class="mark" aria-hidden="true"><i class="c"></i><i class="c"></i><i></i><i class="m"></i><i></i><i class="g"></i><i class="g"></i><i></i><i class="c"></i><i></i><i class="m"></i><i class="m"></i></div>
+    <div>
+    <h1>LED Panel Atölyesi</h1>
+    <p class="sub">iPixel Color uyumlu LED panele Bluetooth ile animasyon, oyun ve saat gönder.</p>
+    </div>
+  </header>
+
+  <section class="card" aria-label="Bağlantı">
+    <div class="status"><span id="dot" class="dot"></span><span id="statusText">Bağlı değil, önizleme çalışıyor</span></div>
+    <div class="row">
+      <button id="btnConnect" class="primary" type="button">Panele bağlan</button>
+      <button id="btnAll" class="link" type="button">Panel listede çıkmıyor mu? Tüm cihazları göster</button>
+    </div>
+    <p id="errBox" class="warn" hidden></p>
+    <div class="row">
+      <div class="field">
+        <label for="rot">Panel yönü</label>
+        <select id="rot">
+          <option value="0">Yatay</option>
+          <option value="1">Dikey, saat yönünde</option>
+          <option value="2">Dikey, saat yönünün tersi</option>
+          <option value="3">Yatay, ters</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="bri">Parlaklık <span id="briVal" style="font-family:var(--f-mono)">50</span></label>
+        <input id="bri" type="range" min="5" max="100" value="50">
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="Önizleme" style="display:flex;flex-direction:column;gap:8px">
+    <div class="bed"><canvas id="view" tabindex="0" aria-label="Panel önizlemesi"></canvas></div>
+    <div class="readout"><span id="info">&nbsp;</span><span id="fps"></span><button class="rec" id="recBtn" type="button">4 sn kaydet</button></div>
+  </section>
+
+  <nav class="cats" aria-label="Kategoriler">
+    <button class="cat" data-cat="gorsel" aria-pressed="true" type="button">Saat ve görsel</button>
+    <button class="cat" data-cat="oyun" aria-pressed="false" type="button">Oyunlar</button>
+    <button class="cat" data-cat="hafiza" aria-pressed="false" type="button">Panel hafızası</button>
+    <button class="cat" data-cat="arac" aria-pressed="false" type="button">Araçlar</button>
+  </nav>
+  <nav class="tabs" id="subtabs" aria-label="Uygulamalar">
+    <button class="tab" data-tab="clock" data-cat="gorsel" aria-pressed="false" type="button">Saat</button>
+    <button class="tab" data-tab="fx" data-cat="gorsel" aria-pressed="true" type="button">Efektler</button>
+    <button class="tab" data-tab="text" data-cat="gorsel" aria-pressed="false" type="button">Yazı</button>
+    <button class="tab" data-tab="draw" data-cat="gorsel" aria-pressed="false" type="button">Çizim</button>
+    <button class="tab" data-tab="inbox" data-cat="gorsel" aria-pressed="false" type="button">Gelen kutusu<span class="badge" id="inboxBadge" hidden></span></button>
+    <button class="tab" data-tab="snake" data-cat="oyun" aria-pressed="false" type="button">Yılan</button>
+    <button class="tab" data-tab="brick" data-cat="oyun" aria-pressed="false" type="button">Tuğla</button>
+    <button class="tab" data-tab="pong" data-cat="oyun" aria-pressed="false" type="button">Pong</button>
+    <button class="tab" data-tab="flappy" data-cat="oyun" aria-pressed="false" type="button">Flappy</button>
+    <button class="tab" data-tab="tetris" data-cat="oyun" aria-pressed="false" type="button">Tetris</button>
+    <button class="tab" data-tab="dino" data-cat="oyun" aria-pressed="false" type="button">Dino</button>
+    <button class="tab" data-tab="space" data-cat="oyun" aria-pressed="false" type="button">Uzay</button>
+    <button class="tab" data-tab="car" data-cat="oyun" aria-pressed="false" type="button">Araba</button>
+    <button class="tab" data-tab="simon" data-cat="oyun" aria-pressed="false" type="button">Simon</button>
+    <button class="tab" data-tab="lib" data-cat="hafiza" aria-pressed="false" type="button">Kütüphane</button>
+    <button class="tab" data-tab="test" data-cat="arac" aria-pressed="false" type="button">Test</button>
+  </nav>
+
+  <section class="card" id="ctl-fx" aria-label="Efekt ayarları">
+    <div class="chips" id="fxChips">
+      <button class="chip" data-fx="plasma" aria-pressed="true" type="button">Plazma</button>
+      <button class="chip" data-fx="fire" aria-pressed="false" type="button">Ateş</button>
+      <button class="chip" data-fx="rain" aria-pressed="false" type="button">Yağmur</button>
+      <button class="chip" data-fx="stars" aria-pressed="false" type="button">Yıldızlar</button>
+      <button class="chip" data-fx="rainbow" aria-pressed="false" type="button">Gökkuşağı</button>
+    </div>
+  </section>
+
+  <section class="card" id="ctl-game" aria-label="Oyun kontrolleri" hidden>
+    <div class="pad" id="pad">
+      <button class="u" data-d="U" type="button" aria-label="Yukarı">▲</button>
+      <button class="l" data-d="L" type="button" aria-label="Sol">◀</button>
+      <button class="d" data-d="D" type="button" aria-label="Aşağı">▼</button>
+      <button class="r" data-d="R" type="button" aria-label="Sağ">▶</button>
+      <button class="a" id="btnA" data-d="A" type="button" aria-label="Aksiyon" hidden>A</button>
+    </div>
+    <p class="hint" id="gameHint">Okları, klavyeyi ya da önizlemede parmağınla kaydırmayı kullan.</p>
+  </section>
+
+  <section class="card" id="ctl-text" aria-label="Yazı ayarları" hidden>
+    <div class="field"><label for="txt">Kayan yazı</label><input id="txt" type="text" value="MERHABA DUNYA" maxlength="60" autocomplete="off"></div>
+    <div class="row">
+      <div class="field"><label for="txtSpeed">Hız</label><input id="txtSpeed" type="range" min="6" max="40" value="16"></div>
+      <div class="swatches" id="txtColors"></div>
+    </div>
+    <p class="hint">Yazı tipi 3×5 pikseldir. Türkçe harfler İngilizce karşılıklarına çevrilir.</p>
+  </section>
+
+  <section class="card" id="ctl-clock" aria-label="Saat ayarları" hidden>
+    <div class="field"><label>Stil</label>
+      <div class="swatches" id="clkStyle">
+        <button class="chip" type="button" data-k="style" data-v="digital" aria-pressed="true">Dijital</button>
+        <button class="chip" type="button" data-k="style" data-v="analog" aria-pressed="false">Analog</button>
+      </div></div>
+    <div class="field"><label>Rakam kalınlığı</label>
+      <div class="swatches" id="clkScale">
+        <button class="chip" type="button" data-k="scale" data-v="1" aria-pressed="true">İnce (1 piksel)</button>
+        <button class="chip" type="button" data-k="scale" data-v="2" aria-pressed="false">Büyük (2 piksel)</button>
+      </div></div>
+    <div class="field"><label>Göster</label>
+      <div class="swatches" id="clkToggles">
+        <button class="chip" type="button" data-t="sec" aria-pressed="true">Saniye</button>
+        <button class="chip" type="button" data-t="date" aria-pressed="true">Tarih</button>
+        <button class="chip" type="button" data-t="name" aria-pressed="true">İsim</button>
+        <button class="chip" type="button" data-t="h24" aria-pressed="true">24 saat</button>
+        <button class="chip" type="button" data-t="blink" aria-pressed="true">Yanıp sönen ":"</button>
+        <button class="chip" type="button" data-t="rain" aria-pressed="true">Yağmur</button>
+      </div></div>
+    <div class="field"><label for="clkText">İsim yazısı</label><input id="clkText" type="text" value="APOKUN" maxlength="12" autocomplete="off"></div>
+    <div class="field"><label>Saat rengi</label><div class="swatches" id="clkTime"></div></div>
+    <div class="field"><label>Tarih rengi</label><div class="swatches" id="clkDate"></div></div>
+    <div class="field"><label>İsim rengi</label><div class="swatches" id="clkName"></div></div>
+    <div class="field"><label>Yağmur rengi</label><div class="swatches" id="clkRain"></div></div>
+    <p class="hint">2 piksellik büyük saatte saniye, rakamların altında ilerleyen bir çizgi olarak görünür. Dikey konumda boyut seçimi etkisizdir. Analogda tarih ve isim sağ altta kayar.</p>
+    <div class="row">
+      <button class="chip" id="btnSaveGif" type="button">Panele kaydet (isim animasyonu)</button>
+      <button class="chip" id="btnSavePng" type="button">Panele kaydet (tek resim)</button>
+    </div>
+    <p class="hint">Kayıt, fişi çekip taktığında panelin kendi hafızasındaki isim tabelasını gösterir. Saat telefon bağlıyken çalışır. Bu özellik deneyseldir.</p>
+  </section>
+
+  <section class="card" id="ctl-lib" aria-label="Panel kütüphanesi" hidden>
+    <h2 class="ttl">Panelin hafızası</h2>
+    <p class="hint">Panelin 9 yeri var. Fişi takınca panel dolu yerleri sırayla döndürür. Küçük resimler, bu telefondan yüklediklerinin kopyasıdır.</p>
+    <p class="cap" id="libCap">&nbsp;</p>
+    <div class="slots" id="libSlots"></div>
+    <div class="row">
+      <button class="chip" id="libUp" type="button" aria-label="Öne al">← Öne al</button>
+      <button class="chip" id="libDown" type="button" aria-label="Arkaya al">Arkaya al →</button>
+      <button class="chip" id="libDel" type="button">Bu yeri sil</button>
+    </div>
+    <h2 class="ttl">Seçili yere ekle</h2>
+    <div class="field"><label>İçerik türü</label>
+      <div class="swatches" id="libSrc">
+        <button class="chip" type="button" data-src="sign" aria-pressed="true">Hazır tabela</button>
+        <button class="chip" type="button" data-src="name" aria-pressed="false">İsim tabelası</button>
+        <button class="chip" type="button" data-src="scroll" aria-pressed="false">Kayan yazı</button>
+        <button class="chip" type="button" data-src="draw" aria-pressed="false">Çizimim</button>
+        <button class="chip" type="button" data-src="rec" aria-pressed="false">Ekran kaydı</button>
+        <button class="chip" type="button" data-src="file" aria-pressed="false">Resim / GIF</button>
+        <button class="chip" type="button" data-src="inbox" aria-pressed="false">Gelen kutusu</button>
+      </div></div>
+    <div class="field" id="libSignRow"><label>Tabela</label><div class="swatches" id="libSigns"></div></div>
+    <div class="field" id="libTextRow" hidden><label for="libText">Yazı</label><input id="libText" type="text" value="MERHABA" maxlength="40" autocomplete="off">
+      <div class="swatches" id="libColor"></div></div>
+    <div class="field" id="libFileRow" hidden><label for="libFile">Dosya</label><input id="libFile" type="file" accept="image/*">
+      <div class="swatches" id="libFit">
+        <button class="chip" type="button" data-fit="contain" aria-pressed="true">Sığdır</button>
+        <button class="chip" type="button" data-fit="cover" aria-pressed="false">Doldur</button>
+      </div></div>
+    <p class="hint" id="libHint"></p>
+    <div class="row">
+      <button class="chip" id="libSave" type="button" style="background:var(--accent);color:var(--accent-ink);font-weight:600">Seçili yere kaydet</button>
+      <button class="chip" id="libLive" type="button">Canlı moda dön</button>
+      <button class="chip" id="libDelAll" type="button">Hepsini sil</button>
+    </div>
+  </section>
+
+  <section class="card" id="ctl-test" aria-label="Panel testleri" hidden>
+    <p class="hint">Her düğme panele komut gönderir, panelin yanıtlarını aşağıdaki günlüğe yazar. Testten sonra günlüğü kopyalayıp bana yapıştır. Panelde ne gördüğünü de yaz.</p>
+    <p class="cap" id="testCap">&nbsp;</p>
+    <div class="row">
+      <button class="chip" id="tAll" type="button">Hepsini çalıştır</button>
+      <button class="chip" id="tLive" type="button">Canlı moda dön</button>
+    </div>
+    <div class="row" id="tBtns">
+      <button class="chip" data-test="info" type="button">Panel bilgisi</button>
+      <button class="chip" data-test="bri" type="button">Parlaklık</button>
+      <button class="chip" data-test="clock" type="button">Dahili saat stilleri</button>
+      <button class="chip" data-test="slots" type="button">Hafıza yerleri 1-9</button>
+      <button class="chip" data-test="plist" type="button">Sıra listesi</button>
+      <button class="chip" data-test="cap" type="button">Kapasite</button>
+      <button class="chip" data-test="def" type="button">Varsayılan mod</button>
+    </div>
+    <div class="row">
+      <button class="chip" data-test="erase" type="button">Tüm hafızayı sil (başlangıç ekranı)</button>
+    </div>
+    <p class="hint">Hepsini çalıştır, hafıza yerlerini 1-9 numaralı rakamlarla ezer ve kapasite testi 9. yere büyük içerik yazar. Silme düğmesi ayrıdır, kayıtlı tabelayı da siler.</p>
+    <div class="field"><label for="lstIn">Sıra listesi (örnek: 1,2,3)</label>
+      <div class="row"><input id="lstIn" type="text" value="1,2,3" autocomplete="off" style="flex:1 1 120px;min-width:0">
+        <button class="chip" id="lstFixed" type="button">Doğru uzunluk</button><button class="chip" id="lstDoc" type="button">Belgedeki uzunluk</button></div></div>
+    <div class="field"><label for="delIn">Tek yer sil (1-9)</label>
+      <div class="row"><input id="delIn" type="text" value="9" inputmode="numeric" autocomplete="off" style="flex:1 1 80px;min-width:0">
+        <button class="chip" id="delFixed" type="button">Doğru uzunluk</button><button class="chip" id="delDoc" type="button">Belgedeki uzunluk</button></div></div>
+    <p class="hint">Bunlar tek tek denemek içindir. Gönderdikten sonra panelde ne olduğuna bak, bozulursa "Canlı moda dön"e bas.</p>
+    <div class="field"><label for="rawHex">Elle komut (hex)</label>
+      <div class="row"><input id="rawHex" type="text" placeholder="05 00 04 80 32" autocomplete="off" style="flex:1 1 180px;min-width:0"><button class="chip" id="rawSend" type="button">Gönder</button></div></div>
+    <p class="hint">Dikkat: elle komut panele doğrudan gider. Bilmediğin komutu gönderme.</p>
+    <textarea class="logbox" id="logBox" readonly aria-label="Günlük"></textarea>
+    <div class="row"><button class="chip" id="logCopy" type="button">Günlüğü kopyala</button><button class="chip" id="logClear" type="button">Temizle</button></div>
+  </section>
+
+  <section class="card" id="ctl-inbox" aria-label="Gelen kutusu" hidden>
+    <h2 class="ttl">Gelen kutusu</h2>
+    <p class="hint">Claude'a tarif ettiğin çizimler GitHub deposuna yüklenir, bu sayfa birkaç saniyede bir bakıp buraya getirir.</p>
+    <p id="inboxStatus">&nbsp;</p>
+    <p class="cap" id="inboxCap">&nbsp;</p>
+    <div class="slots" id="inboxList"></div>
+    <div class="row">
+      <button class="chip" id="inboxPrev" type="button">← Önceki</button>
+      <button class="chip" id="inboxNext" type="button">Sonraki →</button>
+      <button class="chip" id="inboxNow" type="button">Şimdi bak</button>
+    </div>
+    <div class="field"><label>Yerleşim</label>
+      <div class="swatches" id="inboxFit">
+        <button class="chip" type="button" data-fit="center" aria-pressed="false">Gerçek boyut</button>
+        <button class="chip" type="button" data-fit="zoom" aria-pressed="true">Büyüt (tam kat)</button>
+      </div></div>
+    <div class="field"><label>Seçenekler</label>
+      <div class="swatches">
+        <button class="chip" type="button" id="inboxAuto" aria-pressed="true">Yeni gelince göster</button>
+      </div></div>
+    <div class="row">
+      <button class="chip" id="inboxEdit" type="button">Çizimde düzenle</button>
+      <button class="chip" id="inboxStore" type="button">Panel hafızasına kaydet</button>
+    </div>
+    <div class="field"><label for="inboxRepo">GitHub deposu</label>
+      <input id="inboxRepo" type="text" value="apokyun/led-panel-gelen-kutusu" autocomplete="off" spellcheck="false"></div>
+  </section>
+
+  <section class="card" id="ctl-draw" aria-label="Çizim ayarları" hidden>
+    <div class="swatches" id="drawColors"></div>
+    <div class="row"><button class="chip" id="btnClear" type="button">Temizle</button></div>
+    <p class="hint">Önizlemeye dokunup sürükleyerek çiz. Siyah silgi görevi görür.</p>
+  </section>
+</main>
+
+<script>
+/*CORE_START*/
+const Core = (() => {
+  const SERVICE = 0x00fa, WRITE = 0xfa02, NOTIFY = 0xfa03;
+  const PANELS = {0x00:[64,64],0x80:[64,64],0x81:[32,32],0x82:[32,16],0x83:[64,16],0x84:[96,16],0x85:[64,20],
+    0x86:[128,32],0x87:[144,16],0x88:[192,16],0x89:[48,24],0x8a:[64,32],0x8b:[96,32],0x8c:[128,32],0x8d:[96,32],
+    0x8e:[160,32],0x8f:[192,32],0x94:[16,16]};
+  const frameSizeFor = code => (code === 0x00 || code === 0x80 || code === 0x81) ? 12288 : 4096;
+  const u16 = n => [n & 255, (n >> 8) & 255];
+  const u32 = n => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+  const cmd = (c, payload) => Uint8Array.from([...u16(4 + payload.length), ...u16(c), ...payload]);
+  const handshake = d => cmd(0x8001, [d.getHours(), d.getMinutes(), d.getSeconds(), 0]);
+  const brightness = lvl => cmd(0x8004, [Math.max(0, Math.min(100, lvl | 0))]);
+  const diy = mode => cmd(0x0104, [mode]);
+
+
+  // Panele kalıcı içerik yükleme (deneysel): tip 0x0002 PNG, 0x0003 GIF
+  function crc32(bytes) {
+    let c = 0xffffffff;
+    for (let i = 0; i < bytes.length; i++) {
+      c ^= bytes[i];
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (c >>> 1) ^ 0xedb88320 : c >>> 1;
+    }
+    return (c ^ 0xffffffff) >>> 0;
+  }
+  function storePackets(type, data, bufNo, chunk = 4096) {
+    const crc = crc32(data), out = [];
+    for (let off = 0, i = 0; off < data.length || i === 0; off += chunk, i++) {
+      const part = data.subarray(off, Math.min(data.length, off + chunk));
+      const p = new Uint8Array(15 + part.length);
+      p.set([...u16(15 + part.length), type & 255, (type >> 8) & 255, i === 0 ? 0 : 2, ...u32(data.length), ...u32(crc), 0, bufNo], 0);
+      p.set(part, 15);
+      out.push(p);
+    }
+    return out;
+  }
+  function lzw(idx, minCode) {
+    const clear = 1 << minCode, eoi = clear + 1;
+    let size = minCode + 1, next = eoi + 1, dict = new Map(), cur = 0, nb = 0;
+    const out = [];
+    const emit = c => { cur |= c << nb; nb += size; while (nb >= 8) { out.push(cur & 255); cur >>= 8; nb -= 8; } };
+    emit(clear);
+    let prefix = idx[0];
+    for (let i = 1; i < idx.length; i++) {
+      const k = idx[i], key = prefix * 256 + k, hit = dict.get(key);
+      if (hit !== undefined) { prefix = hit; continue; }
+      emit(prefix);
+      if (next < 4096) { dict.set(key, next++); if (next > (1 << size)) size++; }
+      else { emit(clear); dict = new Map(); size = minCode + 1; next = eoi + 1; }
+      prefix = k;
+    }
+    emit(prefix); emit(eoi);
+    if (nb > 0) out.push(cur & 255);
+    return out;
+  }
+  function gifEncode(frames, w, h, delayCs) {
+    const q = (r, g, b) => (r & 0xe0) | ((g & 0xe0) >> 3) | (b >> 6);
+    let map = new Map(), quant = false;
+    for (const f of frames) for (let i = 0; i < f.length; i += 3) {
+      const key = (f[i] << 16) | (f[i + 1] << 8) | f[i + 2];
+      if (!map.has(key)) map.set(key, map.size);
+    }
+    if (map.size > 256) {
+      quant = true; map = new Map();
+      for (const f of frames) for (let i = 0; i < f.length; i += 3) {
+        const key = q(f[i], f[i + 1], f[i + 2]); if (!map.has(key)) map.set(key, map.size);
+      }
+    }
+    const pal = [];
+    for (const [key, id] of map) {
+      if (quant) pal[id] = [(key & 0xe0), ((key << 3) & 0xe0), ((key << 6) & 0xc0)];
+      else pal[id] = [(key >> 16) & 255, (key >> 8) & 255, key & 255];
+    }
+    let bits = 1; while ((1 << bits) < pal.length) bits++;
+    const out = [...[71, 73, 70, 56, 57, 97], ...u16(w), ...u16(h), 0x80 | (7 << 4) | (bits - 1), 0, 0];
+    for (let i = 0; i < (1 << bits); i++) out.push(...(pal[i] || [0, 0, 0]));
+    out.push(0x21, 0xff, 0x0b, ...[...'NETSCAPE2.0'].map(c => c.charCodeAt(0)), 3, 1, 0, 0, 0);
+    const minCode = Math.max(2, bits);
+    for (let fi = 0; fi < frames.length; fi++) {
+      const f = frames[fi], dcs = Array.isArray(delayCs) ? delayCs[fi] : delayCs;
+      out.push(0x21, 0xf9, 4, 0x04, ...u16(dcs), 0, 0);
+      out.push(0x2c, 0, 0, 0, 0, ...u16(w), ...u16(h), 0);
+      const idx = new Uint8Array(w * h);
+      for (let i = 0; i < w * h; i++) {
+        const j = i * 3; idx[i] = map.get(quant ? q(f[j], f[j + 1], f[j + 2]) : (f[j] << 16) | (f[j + 1] << 8) | f[j + 2]);
+      }
+      const data = lzw(idx, minCode);
+      out.push(minCode);
+      for (let o = 0; o < data.length; o += 255) { const part = data.slice(o, o + 255); out.push(part.length, ...part); }
+      out.push(0);
+    }
+    out.push(0x3b);
+    return Uint8Array.from(out);
+  }
+  // 3-3-2 paletine (8x8x4 = 256 renk) indirger; diffuse ise Floyd-Steinberg hata yayılımı uygular
+  function dither332(frames, w, h, diffuse) {
+    const lv = [8, 8, 4];
+    return frames.map(f => {
+      const buf = Float32Array.from(f), out = new Uint8Array(f.length);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let c = 0; c < 3; c++) {
+        const i = (y * w + x) * 3 + c, old = Math.max(0, Math.min(255, buf[i])), step = 255 / (lv[c] - 1), nv = Math.round(old / step) * step;
+        out[i] = Math.round(nv);
+        if (diffuse) {
+          const e = old - nv;
+          if (x + 1 < w) buf[i + 3] += e * 7 / 16;
+          if (y + 1 < h) {
+            if (x > 0) buf[i + w * 3 - 3] += e * 3 / 16;
+            buf[i + w * 3] += e * 5 / 16;
+            if (x + 1 < w) buf[i + w * 3 + 3] += e / 16;
+          }
+        }
+      }
+      return out;
+    });
+  }
+  // Soldan sağa kayan yazı: her kare 1 piksel
+  function scrollFrames(w, h, text, color) {
+    const t = normalize(text), tw = textWidth(t), n = tw + w + 1, g = new Gfx(w, h), y = Math.floor((h - 5) / 2), out = [];
+    for (let i = 0; i < n; i++) { g.clear(); g.text(t, w - i, y, color); out.push(Uint8Array.from(g.buf)); }
+    return out;
+  }
+  // Yağmurlu isim tabelası: n karelik kusursuz döngü
+  function bannerFrames(w, h, text, colors, n = 32) {
+    const g = new Gfx(w, h), t = normalize(text), tw = textWidth(t);
+    const R = h * 2, cols = [];
+    for (let x = 0; x < w; x++) cols.push({ y0: (x * 7 + (x * x) % 11) % R, v: (x % 3 === 0) ? 2 : 1, len: 3 + (x % 4) });
+    const mask = new Uint8Array(w * h), x0 = Math.floor((w - tw) / 2), y0 = Math.floor((h - 5) / 2);
+    for (let i = 0; i < t.length; i++) {
+      const rows = FONT[t[i]] || FONT[' '];
+      for (let r = 0; r < 5; r++) for (let k = 0; k < 3; k++) if (rows[r * 3 + k] === '1') {
+        const X = x0 + i * 4 + k, Y = y0 + r; if (X >= 0 && X < w) mask[Y * w + X] = 1;
+      }
+    }
+    const frames = [];
+    for (let f = 0; f < n; f++) {
+      g.clear();
+      if (colors.rain.some(v => v)) for (let x = 0; x < w; x++) {
+        const d = cols[x], hp = (d.y0 + f * d.v) % R;
+        for (let k = 0; k < d.len; k++) {
+          const y = (((hp - k) % R) + R) % R; if (y >= h || mask[y * w + x]) continue;
+          const fa = k === 0 ? 1 : Math.max(0.12, 0.55 - k * 0.12);
+          g.set(x, y, colors.rain.map(v => Math.round(v * fa)));
+        }
+      }
+      g.text(t, x0, y0, colors.name);
+      frames.push(Uint8Array.from(g.buf));
+    }
+    return frames;
+  }
+
+  // Test için ek komutlar (belge: iPIXEL-Protocol-Documentation)
+  const clockMode = (style, h24, showDate, d) => cmd(0x0106, [style, h24 ? 1 : 0, showDate ? 1 : 0, d.getFullYear() % 100, d.getMonth() + 1, d.getDate(), d.getDay() || 7]);
+  const defaultMode = () => cmd(0x8003, []);
+  // variant 'fixed': uzunluk gerçek bayt sayısı; 'doc': belgede yazdığı gibi (4+adet)
+  function listCmd(code, bufs, variant) {
+    const payload = [bufs.length & 255, (bufs.length >> 8) & 255, ...bufs];
+    if (variant === 'doc') return Uint8Array.from([4 + bufs.length, 0, code & 255, (code >> 8) & 255, ...payload]);
+    return cmd(code, payload);
+  }
+  const programList = (bufs, variant) => listCmd(0x8008, bufs, variant);
+  const eraseBuffers = (bufs, variant) => listCmd(0x0102, bufs, variant);
+
+  function liveFrames(rgb, frameSize) {
+    const total = rgb.length, out = [];
+    for (let off = 0, i = 0; off < total; off += frameSize, i++) {
+      const chunk = rgb.subarray(off, Math.min(total, off + frameSize));
+      const p = new Uint8Array(9 + chunk.length);
+      p.set([...u16(9 + chunk.length), 0, 0, i === 0 ? 0 : 2, ...u32(total)], 0);
+      p.set(chunk, 9);
+      out.push(p);
+    }
+    return out;
+  }
+  function splitWrites(p, size = 509) {
+    const out = [];
+    for (let o = 0; o < p.length; o += size) out.push(p.subarray(o, Math.min(p.length, o + size)));
+    return out;
+  }
+  function parseNotify(b) {
+    if (!b || b.length < 5) return null;
+    const r = { cmd: b[2] | (b[3] << 8) };
+    if (r.cmd === 0x8001) { r.panel = b[4]; r.pin = b.length > 10 && b[10] === 1; }
+    else r.status = b[4];
+    return r;
+  }
+  const same = (a, b) => { if (!a || !b || a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
+
+  // Mantıksal (oyun) piksel -> panel pikseli. rot: 0 yatay, 1 dikey saat yönü, 2 dikey ters, 3 yatay ters.
+  const logicalSize = (rot, W, H) => (rot === 1 || rot === 2) ? [H, W] : [W, H];
+  function mapPixel(rot, lw, lh, x, y) {
+    switch (rot) {
+      case 1: return [lh - 1 - y, x];
+      case 2: return [y, lw - 1 - x];
+      case 3: return [lw - 1 - x, lh - 1 - y];
+      default: return [x, y];
+    }
+  }
+  function toDeviceRGB(lbuf, lw, lh, rot, W, H) {
+    const out = new Uint8Array(W * H * 3);
+    for (let y = 0; y < lh; y++) for (let x = 0; x < lw; x++) {
+      const [dx, dy] = mapPixel(rot, lw, lh, x, y);
+      const i = (y * lw + x) * 3, j = (dy * W + dx) * 3;
+      out[j] = lbuf[i]; out[j + 1] = lbuf[i + 1]; out[j + 2] = lbuf[i + 2];
+    }
+    return out;
+  }
+
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  function hsv(h, s, v) {
+    h = ((h % 360) + 360) % 360;
+    const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+    let r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; } else if (h < 180) { g = c; b = x; }
+    else if (h < 240) { g = x; b = c; } else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+    return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+  }
+
+  const FONT = {
+    '0':'111101101101111','1':'010110010010111','2':'111001111100111','3':'111001111001111','4':'101101111001001',
+    '5':'111100111001111','6':'111100111101111','7':'111001010010010','8':'111101111101111','9':'111101111001111',
+    A:'010101111101101',B:'110101110101110',C:'011100100100011',D:'110101101101110',E:'111100110100111',
+    F:'111100110100100',G:'011100101101011',H:'101101111101101',I:'111010010010111',J:'001001001101010',
+    K:'101101110101101',L:'100100100100111',M:'101111111101101',N:'110101101101101',O:'010101101101010',
+    P:'110101110100100',Q:'010101101111011',R:'110101110101101',S:'011100010001110',T:'111010010010010',
+    U:'101101101101111',V:'101101101101010',W:'101101111111101',X:'101101010101101',Y:'101101010010010',
+    Z:'111001010100111',' ':'000000000000000','!':'010010010000010','.':'000000000000010','-':'000000111000000',
+    ':':'000010000010000','?':'110001010000010'
+  };
+  const TR = { 'Ç':'C', 'Ğ':'G', 'İ':'I', 'Ö':'O', 'Ş':'S', 'Ü':'U' };
+  const normalize = s => [...String(s).toLocaleUpperCase('tr-TR')].map(ch => TR[ch] || (FONT[ch] ? ch : ' ')).join('');
+  const textWidth = s => Math.max(0, [...s].length * 4 - 1);
+
+  class Gfx {
+    constructor(w, h) { this.w = w; this.h = h; this.buf = new Uint8Array(w * h * 3); }
+    clear(c = [0, 0, 0]) { for (let i = 0; i < this.buf.length; i += 3) { this.buf[i] = c[0]; this.buf[i + 1] = c[1]; this.buf[i + 2] = c[2]; } }
+    set(x, y, c) {
+      x = Math.floor(x); y = Math.floor(y);
+      if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
+      const i = (y * this.w + x) * 3; this.buf[i] = c[0]; this.buf[i + 1] = c[1]; this.buf[i + 2] = c[2];
+    }
+    rect(x, y, w, h, c) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.set(x + i, y + j, c); }
+    glyph(ch, x, y, c) {
+      const rows = FONT[ch] || FONT[' '];
+      for (let r = 0; r < 5; r++) for (let k = 0; k < 3; k++) if (rows[r * 3 + k] === '1') this.set(x + k, y + r, c);
+    }
+    text(s, x, y, c) { for (const ch of s) { this.glyph(ch, x, y, c); x += 4; } }
+  }
+
+  /* ---------- Efektler ---------- */
+  function Effect(kind, lw, lh) {
+    const n = lw * lh; let t = 0, acc = 0;
+    const heat = new Float32Array(n);
+    const drops = Array.from({ length: lw }, () => ({ y: -Math.random() * lh, v: 6 + Math.random() * 10, len: 3 + Math.floor(Math.random() * 5) }));
+    const newStar = init => ({ x: (Math.random() - .5) * 2, y: (Math.random() - .5) * 2, z: init ? Math.random() + .1 : 1 });
+    const stars = Array.from({ length: Math.max(20, n >> 3) }, () => newStar(true));
+    return {
+      info: () => kind,
+      dir() {}, pointer() {},
+      step(dt) {
+        t += dt;
+        if (kind === 'fire') {
+          acc += dt;
+          while (acc >= 0.05) {
+            acc -= 0.05;
+            for (let x = 0; x < lw; x++) heat[(lh - 1) * lw + x] = 160 + Math.random() * 95;
+            for (let y = 0; y < lh - 1; y++) for (let x = 0; x < lw; x++) {
+              const a = heat[(y + 1) * lw + Math.max(0, x - 1)], b = heat[(y + 1) * lw + x],
+                    c = heat[(y + 1) * lw + Math.min(lw - 1, x + 1)], d = heat[Math.min(lh - 1, y + 2) * lw + x];
+              heat[y * lw + x] = Math.max(0, (a + b + c + d) / 4 - (255 / lh) * 0.8 * Math.random() * 1.4);
+            }
+          }
+        } else if (kind === 'rain') {
+          for (const d of drops) { d.y += d.v * dt; if (d.y - d.len > lh) { d.y = -Math.random() * 6; d.v = 6 + Math.random() * 10; d.len = 3 + Math.floor(Math.random() * 5); } }
+        } else if (kind === 'stars') {
+          for (let i = 0; i < stars.length; i++) {
+            const s = stars[i]; s.z -= dt * 0.6;
+            const sx = lw / 2 + (s.x / s.z) * (lw / 3), sy = lh / 2 + (s.y / s.z) * (lh / 3);
+            if (s.z < 0.08 || sx < 0 || sy < 0 || sx >= lw || sy >= lh) stars[i] = newStar(false);
+          }
+        }
+      },
+      render(g) {
+        g.clear();
+        if (kind === 'plasma') {
+          for (let y = 0; y < lh; y++) for (let x = 0; x < lw; x++) {
+            const v = Math.sin(x * 0.35 + t) + Math.sin(y * 0.5 - t * 1.3) + Math.sin((x + y) * 0.25 + t * 0.7);
+            g.set(x, y, hsv((v + 3) / 6 * 300 + t * 20, 0.85, 0.9));
+          }
+        } else if (kind === 'fire') {
+          for (let y = 0; y < lh; y++) for (let x = 0; x < lw; x++) {
+            const v = heat[y * lw + x];
+            g.set(x, y, [Math.min(255, v * 3), clamp((v - 85) * 3, 0, 255), clamp((v - 170) * 3, 0, 255)]);
+          }
+        } else if (kind === 'rain') {
+          drops.forEach((d, x) => {
+            g.set(x, Math.floor(d.y), [200, 255, 200]);
+            for (let i = 1; i <= d.len; i++) g.set(x, Math.floor(d.y) - i, [0, Math.round(200 * (1 - i / (d.len + 1))), 20]);
+          });
+        } else if (kind === 'stars') {
+          for (const s of stars) {
+            const b = Math.round(255 * clamp(1.2 - s.z, 0.15, 1));
+            g.set(lw / 2 + (s.x / s.z) * (lw / 3), lh / 2 + (s.y / s.z) * (lh / 3), [b, b, b]);
+          }
+        } else {
+          for (let y = 0; y < lh; y++) for (let x = 0; x < lw; x++) g.set(x, y, hsv((x + y) * 12 + t * 60, 1, 1));
+        }
+      }
+    };
+  }
+
+  /* ---------- Kayan yazı ---------- */
+
+  /* ---------- Saat: dijital 1x/2x, analog, tarih, isim, yağmur ---------- */
+  const CLOCK_DEFAULTS = () => ({
+    style: 'digital', scale: 1, sec: true, date: true, name: true, h24: true, blink: true, rain: true, text: 'APOKUN',
+    colors: { time: [70, 240, 255], date: [255, 60, 200], name: [170, 255, 60], rain: [30, 110, 255] }
+  });
+  function Clock(lw, lh, opt) {
+    opt = opt || {};
+    const now = opt.now || (() => new Date());
+    const cfg = CLOCK_DEFAULTS();
+    const setCfg = o => {
+      if (!o) return;
+      for (const k in o) if (k !== 'colors') cfg[k] = o[k];
+      if (o.colors) Object.assign(cfg.colors, o.colors);
+    };
+    setCfg(opt.cfg);
+    const drops = Array.from({ length: lw }, () => ({ y: -Math.random() * lh * 1.5, v: 5 + Math.random() * 8, len: 3 + Math.floor(Math.random() * 4) }));
+    let t = 0;
+    const p2 = n => String(n).padStart(2, '0');
+    const dim = (c, f) => c.map(v => Math.round(v * f));
+    const parts = () => {
+      const d = now(); let h = d.getHours(); if (!cfg.h24) h = h % 12 || 12;
+      return { hh: p2(h), mm: p2(d.getMinutes()), ss: p2(d.getSeconds()), s: d.getSeconds(), dd: p2(d.getDate()), mo: p2(d.getMonth() + 1), yy: p2(d.getFullYear() % 100), yyyy: d.getFullYear() };
+    };
+    const nameOn = () => cfg.name && normalize(cfg.text).trim().length > 0;
+    function line2(P) {
+      const dateS = P.dd + '.' + P.mo + '.' + P.yy, nm = normalize(cfg.text).trim();
+      if (cfg.date && nameOn()) return (t % 8) >= 5 ? { s: nm, c: cfg.colors.name } : { s: dateS, c: cfg.colors.date };
+      if (cfg.date) return { s: dateS, c: cfg.colors.date };
+      if (nameOn()) return { s: nm, c: cfg.colors.name };
+      return null;
+    }
+    function render(g) {
+      g.clear();
+      const mask = new Uint8Array(lw * lh), px = [], P = parts();
+      const put = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= lw || y >= lh) return; px.push([x, y, c]); mask[y * lw + x] = 1; };
+      const block = (x, y, s, c) => { for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) put(x + i, y + j, c); };
+      const blinkOn = !cfg.blink || P.s % 2 === 0;
+      // basamaklı zaman dizgesi: rakam 3 sütun, iki nokta 1 sütun, aralar 1 piksel
+      const timeW = (str, s) => { let w = 0; for (const ch of str) w += (ch === ':' ? 1 : 3) * s; return w + (str.length - 1); };
+      const drawTime = (str, x, y, s, c) => {
+        for (const ch of str) {
+          if (ch === ':') { if (blinkOn) { block(x, y + s, s, c); block(x, y + 3 * s, s, c); } x += s + 1; continue; }
+          const rows = FONT[ch];
+          for (let r = 0; r < 5; r++) for (let k = 0; k < 3; k++) if (rows[r * 3 + k] === '1') block(x + k * s, y + r * s, s, c);
+          x += 3 * s + 1;
+        }
+      };
+      const small = (str, x, y, c, clipX) => {
+        for (const ch of str) {
+          const rows = FONT[ch] || FONT[' '];
+          for (let r = 0; r < 5; r++) for (let k = 0; k < 3; k++) if (rows[r * 3 + k] === '1' && x + k >= (clipX || 0)) put(x + k, y + r, c);
+          x += 4;
+        }
+      };
+      const marquee = (str, x0, y, c) => {
+        const w = textWidth(str), span = w + (lw - x0);
+        small(str, lw - Math.floor((t * 10) % span), y, c, x0);
+      };
+      const C = cfg.colors;
+      if (lw >= lh && cfg.style === 'analog' && lw >= 28 && lh >= 14) {
+        const cx = 7, cy = 7, ang = f => f * Math.PI * 2;
+        for (let i = 0; i < 12; i++) put(cx + Math.sin(ang(i / 12)) * 7, cy - Math.cos(ang(i / 12)) * 7, i % 3 === 0 ? C.date : dim(C.date, 0.55));
+        const hand = (f, len, c) => {
+          const n = Math.ceil(len * 2);
+          for (let i = 0; i <= n; i++) { const r = len * i / n; put(cx + Math.sin(ang(f)) * r, cy - Math.cos(ang(f)) * r, c); }
+        };
+        const d = now(), hr = (d.getHours() % 12) + d.getMinutes() / 60, mi = d.getMinutes() + d.getSeconds() / 60;
+        hand(hr / 12, 3.6, C.time); hand(mi / 60, 5.6, C.time);
+        if (cfg.sec) hand(d.getSeconds() / 60, 6.4, C.name);
+        put(cx, cy, [255, 255, 255]);
+        const ax = 17, aw = lw - ax;
+        small(P.hh, ax + Math.floor((aw - 7) / 2), 0, C.time);
+        small(P.mm, ax + Math.floor((aw - 7) / 2), 6, C.time);
+        const items = []; if (cfg.date) items.push([P.dd + '.' + P.mo + '.' + P.yy, C.date]); if (nameOn()) items.push([normalize(cfg.text).trim(), C.name]);
+        if (items.length) {
+          // tek öğe sığıyorsa sabit, sığmıyorsa ya da ikiliyse kayar
+          if (items.length === 1 && textWidth(items[0][0]) <= aw) small(items[0][0], ax + Math.floor((aw - textWidth(items[0][0])) / 2), 11, items[0][1]);
+          else { const it = items[Math.floor(t / 6) % items.length]; if (textWidth(it[0]) <= aw && items.length > 1) small(it[0], ax + Math.floor((aw - textWidth(it[0])) / 2), 11, it[1]); else marquee(it[0], ax, 11, it[1]); }
+        }
+      } else if (lw >= lh) {
+        let s = cfg.scale === 2 ? 2 : 1;
+        if (s === 2 && (lh < 10 || timeW('00:00', 2) > lw)) s = 1;
+        const L2 = line2(P), seconds = cfg.sec;
+        const str = (s === 1 && seconds) ? P.hh + ':' + P.mm + ':' + P.ss : P.hh + ':' + P.mm;
+        const bar = seconds && s === 2, tH = 5 * s;
+        const total = tH + (L2 ? 6 : 0) + (bar && !L2 ? 2 : 0);
+        const y0 = Math.max(0, Math.floor((lh - total) / 2)), tw = timeW(str, s), tx = Math.floor((lw - tw) / 2);
+        drawTime(str, tx, y0, s, C.time);
+        if (bar) {
+          const n = Math.round((P.s + 1) / 60 * tw), by = L2 ? y0 + tH : y0 + tH + 1;
+          for (let i = 0; i < n; i++) put(tx + i, by, dim(C.time, 0.8));
+        }
+        if (L2) {
+          const ly = y0 + tH + 1, w = textWidth(L2.s);
+          if (w <= lw) small(L2.s, Math.floor((lw - w) / 2), ly, L2.c); else marquee(L2.s, 0, ly, L2.c);
+        }
+      } else {
+        // dikey: rakamlar alt alta
+        const rowsT = [[P.hh, C.time], [P.mm, C.time]]; if (cfg.sec) rowsT.push([P.ss, C.time]);
+        const info = [], L2 = line2(P);
+        if (L2) {
+          if (L2.c === C.name) { const nm = L2.s; for (let i = 0; i < Math.min(2, Math.ceil(nm.length / 3)); i++) info.push([nm.slice(i * 3, i * 3 + 3), C.name]); }
+          else info.push([P.dd, C.date], [P.mo, C.date]);
+        }
+        const total = rowsT.length * 6 - 1 + (info.length ? 2 + info.length * 6 - 1 : 0);
+        let y = Math.max(0, Math.floor((lh - total) / 2));
+        for (const [str, c] of rowsT) { small(str, Math.floor((lw - textWidth(str)) / 2), y, c); y += 6; }
+        if (info.length) { y += 2; for (const [str, c] of info) { small(str, Math.floor((lw - textWidth(str)) / 2), y, c); y += 6; } }
+      }
+      if (cfg.rain && C.rain.some(v => v)) {
+        for (let x = 0; x < lw; x++) {
+          const d = drops[x];
+          for (let k = 0; k < d.len; k++) {
+            const y = Math.floor(d.y) - k; if (y < 0 || y >= lh || mask[y * lw + x]) continue;
+            const f = k === 0 ? 1 : Math.max(0.12, 0.55 - k * 0.12);
+            g.set(x, y, [Math.round(C.rain[0] * f), Math.round(C.rain[1] * f), Math.round(C.rain[2] * f)]);
+          }
+        }
+      }
+      for (const [X, Y, c] of px) g.set(X, Y, c);
+    }
+    return {
+      info: () => { const P = parts(); return P.hh + ':' + P.mm + ':' + P.ss + '  ' + P.dd + '.' + P.mo + '.' + P.yyyy; },
+      dir() {}, pointer() {}, setCfg, cfg,
+      step(dt) {
+        t += dt;
+        for (const d of drops) if (d.y - d.len > lh) { d.y = -Math.random() * 8; d.v = 5 + Math.random() * 8; d.len = 3 + Math.floor(Math.random() * 4); } else d.y += d.v * dt;
+      },
+      render
+    };
+  }
+
+  function TextScroll(lw, lh, opt) {
+    let text = normalize(opt.text), color = opt.color, speed = opt.speed, x = lw;
+    return {
+      info: () => 'Yazı',
+      dir() {}, pointer() {},
+      set(o) { if (o.text !== undefined) text = normalize(o.text); if (o.color) color = o.color; if (o.speed) speed = o.speed; x = lw; },
+      setSpeed(s) { speed = s; }, setColor(c) { color = c; },
+      step(dt) { x -= speed * dt; if (x < -textWidth(text)) x = lw; },
+      render(g) { g.clear(); g.text(text, Math.round(x), Math.floor((lh - 5) / 2), color); }
+    };
+  }
+
+  /* ---------- Gelen kutusu: GitHub'dan gelen piksel çizimler ---------- */
+  // JSON: { title, w, h, palette: {K: '#rrggbb'}, frames: [[satır...]], delay?, delays? }  '.' ve ' ' sönük
+  function decodeDrawing(j) {
+    if (!j || typeof j !== 'object') throw new Error('çizim boş');
+    const w = j.w | 0, h = j.h | 0;
+    if (w < 1 || h < 1 || w > 64 || h > 64) throw new Error('boyut geçersiz');
+    const pal = {};
+    for (const k in (j.palette || {})) {
+      const m = /^#?([0-9a-f]{6})$/i.exec(String(j.palette[k]));
+      if (m) { const n = parseInt(m[1], 16); pal[k] = [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+    }
+    const src = Array.isArray(j.frames) ? j.frames.slice(0, 64) : [];
+    if (!src.length) throw new Error('kare yok');
+    const frames = src.map(rows => {
+      const out = new Uint8Array(w * h * 3);
+      for (let y = 0; y < h; y++) {
+        const row = Array.isArray(rows) && typeof rows[y] === 'string' ? [...rows[y]] : [];
+        for (let x = 0; x < w; x++) { const c = pal[row[x]]; if (c) out.set(c, (y * w + x) * 3); }
+      }
+      return out;
+    });
+    const base = clamp(Number(j.delay) || 200, 20, 10000);
+    const delays = frames.map((_, i) => clamp(Number(Array.isArray(j.delays) ? j.delays[i] : 0) || base, 20, 10000));
+    return { title: String(j.title || 'adsız'), w, h, frames, delays };
+  }
+  // Çizimin bir karesini lw×lh mantıksal tuvale yerleştirir: ortalar, 'zoom' ise sığan en büyük tam kat büyütür
+  function placeDrawing(frame, w, h, lw, lh, fit) {
+    const out = new Uint8Array(lw * lh * 3);
+    const s = fit === 'zoom' ? Math.max(1, Math.floor(Math.min(lw / w, lh / h))) : 1;
+    const ox = Math.floor((lw - w * s) / 2), oy = Math.floor((lh - h * s) / 2);
+    for (let y = 0; y < h * s; y++) {
+      const Y = oy + y; if (Y < 0 || Y >= lh) continue;
+      for (let x = 0; x < w * s; x++) {
+        const X = ox + x; if (X < 0 || X >= lw) continue;
+        const i = ((Math.floor(y / s)) * w + Math.floor(x / s)) * 3, o = (Y * lw + X) * 3;
+        out[o] = frame[i]; out[o + 1] = frame[i + 1]; out[o + 2] = frame[i + 2];
+      }
+    }
+    return out;
+  }
+  const ENVELOPE = ['WWWWWWWWW', 'WW.....WW', 'W.W...W.W', 'W..W.W..W', 'W...W...W', 'WWWWWWWWW'];
+  function Inbox(lw, lh) {
+    let d = null, fit = 'zoom', fi = 0, acc = 0, t = 0, placed = [];
+    const rebuild = () => { placed = d ? d.frames.map(f => placeDrawing(f, d.w, d.h, lw, lh, fit)) : []; };
+    return {
+      info: () => d ? d.title + (d.frames.length > 1 ? ' · ' + (fi + 1) + '/' + d.frames.length : '') : 'Gelen kutusu boş',
+      dir() {}, pointer() {},
+      show(drawing) { d = drawing; fi = 0; acc = 0; rebuild(); },
+      setFit(f) { fit = f; rebuild(); },
+      step(dt) {
+        t += dt;
+        if (!d || d.frames.length < 2) return;
+        acc += dt * 1000;
+        while (acc >= d.delays[fi]) { acc -= d.delays[fi]; fi = (fi + 1) % d.frames.length; }
+      },
+      render(g) {
+        if (d) { g.buf.set(placed[fi]); return; }
+        g.clear();
+        const on = Math.floor(t * 2) % 2 === 0, x0 = Math.floor((lw - 9) / 2), y0 = Math.floor((lh - 6) / 2);
+        ENVELOPE.forEach((r, j) => { for (let i = 0; i < 9; i++) if (r[i] === 'W') g.set(x0 + i, y0 + j, on ? [90, 160, 255] : [40, 70, 130]); });
+      }
+    };
+  }
+
+  /* ---------- Çizim ---------- */
+  function Draw(lw, lh) {
+    const store = new Uint8Array(lw * lh * 3); let color = [255, 255, 255], last = null;
+    function plot(x, y) { x = Math.floor(x); y = Math.floor(y); if (x < 0 || y < 0 || x >= lw || y >= lh) return; const i = (y * lw + x) * 3; store[i] = color[0]; store[i + 1] = color[1]; store[i + 2] = color[2]; }
+    return {
+      info: () => 'Çizim',
+      dir() {},
+      setColor(c) { color = c; },
+      clear() { store.fill(0); },
+      load(buf) { if (buf && buf.length === store.length) store.set(buf); },
+      pointer(x, y, phase) {
+        if (phase === 'up') { last = null; return; }
+        if (last && phase === 'move') {
+          const steps = Math.max(Math.abs(x - last[0]), Math.abs(y - last[1])) * 2 + 1;
+          for (let i = 0; i <= steps; i++) plot(last[0] + (x - last[0]) * i / steps, last[1] + (y - last[1]) * i / steps);
+        } else plot(x, y);
+        last = [x, y];
+      },
+      step() {},
+      render(g) { g.buf.set(store); }
+    };
+  }
+
+  /* ================= Piksel sanat oyunları (retro arcade) ================= */
+  const COL = { red: [255, 50, 50], orange: [255, 150, 30], yellow: [255, 230, 60], green: [60, 220, 90], cyan: [60, 220, 255],
+    blue: [70, 110, 255], purple: [180, 90, 255], pink: [255, 100, 200], white: [255, 255, 255], gray: [120, 130, 150] };
+  const dimc = (c, f) => [Math.round(c[0] * f), Math.round(c[1] * f), Math.round(c[2] * f)];
+  const rint = n => Math.floor(Math.random() * n);
+  function spr(g, rows, x, y, pal) {
+    rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) { const c = pal[r[i]]; if (c) g.set(x + i, y + j, c); } });
+  }
+  function bigScore(g, s, lw, lh) {
+    const t = String(Math.min(s, 9999));
+    g.text(t, Math.floor((lw - textWidth(t)) / 2), Math.floor((lh - 5) / 2), [255, 200, 60]);
+  }
+  // a: uzun eksen boyunca mesafe (0 = oyuncu tarafı), b: karşı eksen. Yatayda x=a,y=b; dikeyde x=b, y alttan yukarı.
+  function axes(lw, lh) {
+    const land = lw >= lh;
+    return { land, A: land ? lw : lh, B: land ? lh : lw, put(g, a, b, c) { if (land) g.set(a, b, c); else g.set(b, lh - 1 - a, c); } };
+  }
+
+  /* ---------- Yılan (piksel sanat, 2x2 hücre) ---------- */
+  function SnakeArt(lw, lh) {
+    const gw = Math.floor(lw / 2), gh = Math.floor(lh / 2), ox = Math.floor((lw - gw * 2) / 2), oy = Math.floor((lh - gh * 2) / 2);
+    let snake, dir, next, food, alive, score, acc, deadT;
+    const vec = { L: [-1, 0], R: [1, 0], U: [0, -1], D: [0, 1] };
+    function placeFood() {
+      const free = [];
+      for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) if (!snake.some(s => s[0] === x && s[1] === y)) free.push([x, y]);
+      food = free.length ? free[rint(free.length)] : null;
+    }
+    function reset() {
+      const cx = gw >> 1, cy = gh >> 1;
+      snake = [[cx, cy], [cx - 1, cy], [cx - 2, cy]]; dir = [1, 0]; next = [1, 0]; alive = true; score = 0; acc = 0; deadT = 0; placeFood();
+    }
+    reset();
+    return {
+      info: () => 'Skor ' + score,
+      get score() { return score; },
+      dir(d) {
+        if (!alive) { if (deadT > 0.6) reset(); return; }
+        const v = vec[d]; if (!v) return;
+        if (v[0] === -dir[0] && v[1] === -dir[1]) return;
+        next = v;
+      },
+      pointer() {},
+      step(dt) {
+        if (!alive) { deadT += dt; return; }
+        acc += dt;
+        const interval = Math.max(0.09, 0.17 - 0.004 * score);
+        while (acc >= interval && alive) {
+          acc -= interval; dir = next;
+          const head = [(snake[0][0] + dir[0] + gw) % gw, (snake[0][1] + dir[1] + gh) % gh];
+          const eat = food && head[0] === food[0] && head[1] === food[1];
+          const body = eat ? snake : snake.slice(0, -1);
+          if (body.some(s => s[0] === head[0] && s[1] === head[1])) { alive = false; break; }
+          snake.unshift(head);
+          if (eat) { score++; placeFood(); } else snake.pop();
+        }
+      },
+      render(g) {
+        g.clear();
+        const px = (cx, cy, dx, dy, c) => g.set(ox + cx * 2 + dx, oy + cy * 2 + dy, c);
+        if (food) {
+          for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) px(food[0], food[1], dx, dy, COL.red);
+          px(food[0], food[1], 1, 0, [90, 255, 90]);
+        }
+        snake.forEach((s, i) => {
+          for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
+            let c = (dx + dy) % 2 === 0 ? [0, 210, 80] : [0, 130, 50];
+            if (i === snake.length - 1 && snake.length > 3) c = dimc(c, 0.6);
+            if (i === 0) c = [90, 240, 110];
+            if (!alive) c = (dx + dy) % 2 === 0 ? [220, 50, 40] : [140, 30, 30];
+            px(s[0], s[1], dx, dy, c);
+          }
+        });
+        if (alive) { const ex = dir[0] > 0 ? 1 : 0, ey = dir[1] > 0 ? 1 : 0; px(snake[0][0], snake[0][1], ex, ey, COL.white); }
+        if (!alive && deadT > 0.6) { g.clear(); bigScore(g, score, lw, lh); }
+      }
+    };
+  }
+
+  /* ---------- Tuğla kırma (piksel sanat, gölgeli tuğlalar) ---------- */
+  function BreakoutArt(lw, lh) {
+    const pw = Math.max(5, Math.round(lw / 4)), bw = 2, bh = 2, cols = Math.floor(lw / bw), rows = Math.max(2, Math.min(4, Math.floor(lh / 6)));
+    let px, bx, by, vx, vy, cell, bricks, remaining, lives, score, level, serve, over, overT, speed;
+    function build() {
+      cell = new Array(lw * lh).fill(null); bricks = [];
+      const x0 = Math.floor((lw - cols * bw) / 2);
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const b = { x: x0 + c * bw, y: 1 + r * bh, alive: true, hue: r * 55 + 5 };
+        bricks.push(b);
+        for (let dy = 0; dy < bh; dy++) for (let dx = 0; dx < bw; dx++) cell[(b.y + dy) * lw + b.x + dx] = b;
+      }
+      remaining = bricks.length;
+    }
+    const baseSpeed = () => (lh >= 24 ? 18 : 13) * (1 + 0.12 * (level - 1));
+    function resetBall() { bx = px; by = lh - 2; vx = 0; vy = 0; serve = 0.8; speed = baseSpeed(); }
+    function reset() { px = lw / 2; lives = 3; score = 0; level = 1; over = false; overT = 0; build(); resetBall(); }
+    reset();
+    function move(h) {
+      bx += vx * h; by += vy * h;
+      if (bx < 0) { bx = 0; vx = Math.abs(vx); }
+      if (bx > lw - 0.001) { bx = lw - 0.001; vx = -Math.abs(vx); }
+      if (by < 0) { by = 0; vy = Math.abs(vy); }
+      const cx = Math.floor(bx), cy = Math.floor(by);
+      if (cy >= 1 && cy < lh - 1) {
+        const b = cell[cy * lw + cx];
+        if (b && b.alive) {
+          b.alive = false;
+          for (let dy = 0; dy < bh; dy++) for (let dx = 0; dx < bw; dx++) cell[(b.y + dy) * lw + b.x + dx] = null;
+          score++; remaining--; vy = -vy;
+          if (remaining === 0) { level++; build(); resetBall(); return true; }
+        }
+      }
+      if (vy > 0 && by >= lh - 1) {
+        if (Math.abs(bx - px) <= pw / 2 + 0.5 && by < lh - 0.2) {
+          by = lh - 1.01;
+          const rel = clamp((bx - px) / (pw / 2 + 0.5), -1, 1), ang = rel * 1.0;
+          vx = speed * Math.sin(ang); vy = -speed * Math.cos(ang);
+        } else if (by >= lh + 0.3) {
+          lives--;
+          if (lives <= 0) { over = true; overT = 0; } else resetBall();
+          return true;
+        }
+      }
+      return false;
+    }
+    return {
+      info: () => 'Skor ' + score + ' · Seviye ' + level,
+      get score() { return score; },
+      dir(d) {
+        if (over) { if (overT > 0.8) reset(); return; }
+        if (d === 'L') px -= 2; else if (d === 'R') px += 2;
+        px = clamp(px, pw / 2, lw - pw / 2);
+      },
+      pointer(x, y, phase) {
+        if (over) { if (phase === 'down' && overT > 0.8) reset(); return; }
+        if (phase !== 'up') px = clamp(x, pw / 2, lw - pw / 2);
+      },
+      step(dt) {
+        if (over) { overT += dt; return; }
+        if (serve > 0) {
+          serve -= dt; bx = px;
+          if (serve <= 0) { vx = (Math.random() < 0.5 ? -1 : 1) * speed * 0.4; vy = -speed * 0.92; }
+          return;
+        }
+        const n = Math.max(1, Math.ceil(speed * dt / 0.4)), h = dt / n;
+        for (let i = 0; i < n; i++) if (move(h)) break;
+      },
+      render(g) {
+        g.clear();
+        if (over) { bigScore(g, score, lw, lh); return; }
+        for (const b of bricks) if (b.alive) for (let dy = 0; dy < bh; dy++) {
+          const c = dy === 0 ? hsv(b.hue, 0.45, 1) : hsv(b.hue, 1, 0.75);
+          for (let dx = 0; dx < bw; dx++) g.set(b.x + dx, b.y + dy, c);
+        }
+        const x0 = Math.round(px - pw / 2);
+        for (let i = 0; i < pw; i++) g.set(x0 + i, lh - 1, (i === 0 || i === pw - 1) ? COL.orange : [210, 225, 255]);
+        g.set(bx, by, COL.white);
+        for (let i = 0; i < lives; i++) g.set(lw - 1 - i * 2, 0, COL.red);
+      }
+    };
+  }
+
+  /* ---------- Pong ---------- */
+  function Pong(lw, lh) {
+    const ax = axes(lw, lh), A = ax.A, B = ax.B, pl = Math.max(3, Math.round(B / 4)), WIN = 5;
+    let pb, cb, ba, bb, va, vb, ps, cs, over, overT, serve, spd;
+    function resetBall(towardPlayer) {
+      ba = A / 2; bb = B / 2; spd = 11;
+      const ang = (Math.random() - 0.5) * 1.0;
+      va = (towardPlayer ? -1 : 1) * spd * Math.cos(ang); vb = spd * Math.sin(ang); serve = 0.7;
+    }
+    function reset() { pb = B / 2; cb = B / 2; ps = 0; cs = 0; over = false; overT = 0; resetBall(false); }
+    reset();
+    const hit = (paddleB) => Math.abs(bb - paddleB) <= pl / 2 + 0.5;
+    function bounce(paddleB, sign) {
+      spd = Math.min(24, spd * 1.05);
+      const rel = clamp((bb - paddleB) / (pl / 2 + 0.5), -1, 1);
+      vb = rel * spd * 0.8; va = sign * Math.sqrt(Math.max(1, spd * spd - vb * vb));
+    }
+    return {
+      info: () => 'Sen ' + ps + ' - ' + cs + ' Bilgisayar',
+      get dbg() { return { ba, bb, pb, cs, over }; },
+      get score() { return ps; },
+      dir(d) {
+        if (over) { if (overT > 0.8) reset(); return; }
+        if (d === 'U' || d === 'L') pb -= 2; else if (d === 'D' || d === 'R') pb += 2;
+        pb = clamp(pb, pl / 2, B - pl / 2);
+      },
+      pointer(x, y, phase) {
+        if (over) { if (phase === 'down' && overT > 0.8) reset(); return; }
+        if (phase !== 'up') pb = clamp(ax.land ? y : x, pl / 2, B - pl / 2);
+      },
+      step(dt) {
+        if (over) { overT += dt; return; }
+        const target = va > 0 ? bb : B / 2, diff = target - cb, mv = 8 * dt;
+        cb = clamp(cb + (Math.abs(diff) < mv ? diff : Math.sign(diff) * mv), pl / 2, B - pl / 2);
+        if (serve > 0) { serve -= dt; return; }
+        const n = Math.max(1, Math.ceil(spd * dt / 0.4)), h = dt / n;
+        for (let i = 0; i < n; i++) {
+          ba += va * h; bb += vb * h;
+          if (bb < 0) { bb = 0; vb = Math.abs(vb); }
+          if (bb > B - 0.001) { bb = B - 0.001; vb = -Math.abs(vb); }
+          if (va < 0 && ba <= 1) {
+            if (hit(pb)) { ba = 1.001; bounce(pb, 1); }
+            else if (ba < -0.5) { cs++; if (cs >= WIN) { over = true; overT = 0; } else resetBall(true); return; }
+          } else if (va > 0 && ba >= A - 1) {
+            if (hit(cb)) { ba = A - 1.001; bounce(cb, -1); }
+            else if (ba > A + 0.5) { ps++; if (ps >= WIN) { over = true; overT = 0; } else resetBall(false); return; }
+          }
+        }
+      },
+      render(g) {
+        g.clear();
+        if (over) { g.clear(); bigScore(g, ps, lw, lh); return; }
+        const mid = Math.floor(A / 2);
+        for (let b = 0; b < B; b += 2) ax.put(g, mid, b, [50, 55, 75]);
+        const p0 = Math.round(pb - pl / 2), c0 = Math.round(cb - pl / 2);
+        for (let i = 0; i < pl; i++) { ax.put(g, 0, p0 + i, COL.cyan); ax.put(g, A - 1, c0 + i, COL.orange); }
+        ax.put(g, Math.floor(ba), Math.floor(bb), COL.white);
+        const a = String(ps), c = String(cs);
+        if (ax.land) { g.text(a, Math.floor(lw / 2) - 5, 0, dimc(COL.cyan, 0.7)); g.text(c, Math.floor(lw / 2) + 3, 0, dimc(COL.orange, 0.7)); }
+        else { g.text(a, Math.floor((lw - 3) / 2), Math.floor(lh / 2) + 2, dimc(COL.cyan, 0.7)); g.text(c, Math.floor((lw - 3) / 2), Math.floor(lh / 2) - 7, dimc(COL.orange, 0.7)); }
+      }
+    };
+  }
+
+  /* ---------- Flappy Bird ---------- */
+  function Flappy(lw, lh) {
+    const s = Math.sqrt(lh / 16), grav = 30 * s, flapV = -12 * s, gap = Math.max(6, Math.round(lh * 0.32));
+    const speed = lw >= 32 ? 8 : 6, space = lw >= 32 ? 16 : 12, bx = lw >= 32 ? 6 : 4;
+    const SKY = [10, 24, 80], PAL = { Y: [255, 230, 60], E: [255, 255, 255], B: [255, 130, 30], W: [255, 170, 40] };
+    const UP = ['WYE', 'YYB', '.Y.'], DOWN = ['.YE', 'YYB', 'WW.'];
+    const BODY = [[110, 255, 120], [40, 200, 70], [20, 120, 50]], CAP = [[190, 255, 160], [90, 240, 110], [30, 150, 60]];
+    let by, vy, pipes, state, score, overT, scroll, clouds, t;
+    const newCloud = x => ({ x, y: 1 + rint(Math.max(1, Math.floor(lh / 2) - 2)) });
+    function reset() {
+      by = lh / 2 - 1; vy = 0; pipes = []; state = 'ready'; score = 0; overT = 0; scroll = 0; t = 0;
+      clouds = Array.from({ length: 3 }, (_, i) => newCloud(i * Math.floor(lw / 3) + rint(4)));
+    }
+    reset();
+    function die() { state = 'dead'; overT = 0; }
+    return {
+      info: () => state === 'ready' ? 'Dokun ve başla' : 'Skor ' + score,
+      get dbg() { return { by, vy, pipes, gap, bx, state }; },
+      get score() { return score; },
+      dir(d) {
+        if (d !== 'A' && d !== 'U' && d !== 'T') return;
+        if (state === 'dead') { if (overT > 0.8) reset(); return; }
+        if (state === 'ready') state = 'play';
+        vy = flapV;
+      },
+      pointer() {},
+      step(dt) {
+        t += dt;
+        for (const c of clouds) { c.x -= 1.5 * dt; if (c.x < -5) Object.assign(c, newCloud(lw + rint(6))); }
+        if (state === 'ready') { by = lh / 2 - 1 + Math.sin(t * 4) * 1.2; return; }
+        if (state === 'dead') overT += dt; else scroll += speed * dt;
+        vy += grav * dt; by += vy * dt;
+        if (by < 0) { by = 0; if (vy < 0) vy = 0; }
+        const floorY = lh - 4;
+        if (by >= floorY) { by = floorY; vy = 0; if (state === 'play') die(); }
+        if (state !== 'play') return;
+        const last = pipes[pipes.length - 1];
+        if (!last || last.x <= lw - space) pipes.push({ x: lw, gy: 2 + rint(Math.max(1, lh - gap - 4)), passed: false });
+        for (const p of pipes) { p.x -= speed * dt; if (!p.passed && p.x + 2 < bx) { p.passed = true; score++; } }
+        pipes = pipes.filter(p => p.x > -4);
+        const bt = Math.floor(by), bbm = bt + 2;
+        for (const p of pipes) {
+          const px = Math.floor(p.x);
+          if (bx + 2 >= px && bx <= px + 2 && (bt < p.gy || bbm > p.gy + gap - 1)) { die(); break; }
+        }
+      },
+      render(g) {
+        g.clear(SKY);
+        for (const c of clouds) spr(g, ['.WW.', 'WWWW'], Math.round(c.x), c.y, { W: [60, 90, 190] });
+        for (const p of pipes) {
+          const px = Math.floor(p.x);
+          for (let y = 0; y < lh - 1; y++) {
+            if (y >= p.gy && y <= p.gy + gap - 1) continue;
+            const cap = y === p.gy - 1 || y === p.gy - 2 || y === p.gy + gap || y === p.gy + gap + 1;
+            for (let i = 0; i < 3; i++) g.set(px + i, y, (cap ? CAP : BODY)[i]);
+          }
+        }
+        for (let x = 0; x < lw; x++) g.set(x, lh - 1, ((x + Math.floor(scroll)) % 4 < 2) ? [200, 140, 50] : [90, 200, 60]);
+        spr(g, vy < 0 ? UP : DOWN, bx, Math.floor(by), PAL);
+        if (state === 'play') g.text(String(score), 1, 1, COL.white);
+        if (state === 'dead' && overT > 0.6) { g.clear(); bigScore(g, score, lw, lh); }
+      }
+    };
+  }
+
+  /* ---------- Tetris ---------- */
+  const TETS = {
+    I: { c: COL.cyan, m: [[1, 1, 1, 1]] }, O: { c: COL.yellow, m: [[1, 1], [1, 1]] }, T: { c: COL.purple, m: [[0, 1, 0], [1, 1, 1]] },
+    S: { c: COL.green, m: [[0, 1, 1], [1, 1, 0]] }, Z: { c: COL.red, m: [[1, 1, 0], [0, 1, 1]] },
+    J: { c: COL.blue, m: [[1, 0, 0], [1, 1, 1]] }, L: { c: COL.orange, m: [[0, 0, 1], [1, 1, 1]] }
+  };
+  const rotate = m => m[0].map((_, i) => m.map(r => r[i]).reverse());
+  function Tetris(lw, lh) {
+    const land = lw >= lh, COLS = 10, ROWS = land ? lh - 1 : Math.min(20, lh - 12);
+    const x0 = Math.floor((lw - COLS) / 2), y0 = lh - 1 - ROWS, keys = Object.keys(TETS);
+    let board, cur, nextK, fall, over, overT, flash, flashRows, score, lines, level;
+    const collides = (m, x, y) => {
+      for (let j = 0; j < m.length; j++) for (let i = 0; i < m[j].length; i++) if (m[j][i]) {
+        const bx = x + i, by = y + j;
+        if (bx < 0 || bx >= COLS || by >= ROWS) return true;
+        if (by >= 0 && board[by][bx]) return true;
+      }
+      return false;
+    };
+    function spawn() {
+      const k = nextK; nextK = keys[rint(keys.length)];
+      const m = TETS[k].m.map(r => r.slice());
+      cur = { k, m, x: Math.floor((COLS - m[0].length) / 2), y: 0 };
+      if (collides(cur.m, cur.x, cur.y)) { over = true; overT = 0; }
+    }
+    function reset() {
+      board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+      over = false; overT = 0; flash = 0; flashRows = []; score = 0; lines = 0; level = 1; fall = 0;
+      nextK = keys[rint(keys.length)]; spawn();
+    }
+    reset();
+    const tryMove = (dx, dy) => { if (collides(cur.m, cur.x + dx, cur.y + dy)) return false; cur.x += dx; cur.y += dy; return true; };
+    function lock() {
+      cur.m.forEach((row, j) => row.forEach((v, i) => { if (v && cur.y + j >= 0) board[cur.y + j][cur.x + i] = TETS[cur.k].c; }));
+      flashRows = [];
+      for (let y = 0; y < ROWS; y++) if (board[y].every(c => c)) flashRows.push(y);
+      if (flashRows.length) { flash = 0.18; cur = null; } else spawn();
+    }
+    function clearRows() {
+      const n = flashRows.length;
+      board = board.filter((_, y) => !flashRows.includes(y));
+      while (board.length < ROWS) board.unshift(Array(COLS).fill(null));
+      lines += n; score += [0, 100, 300, 500, 800][n] * level; level = 1 + Math.floor(lines / 10);
+      flashRows = []; spawn();
+    }
+    return {
+      info: () => 'Skor ' + score + ' · Satır ' + lines,
+      get dbg() { return { lines, over, board }; },
+      get score() { return score; },
+      dir(d) {
+        if (over) { if (overT > 0.8) reset(); return; }
+        if (!cur) return;
+        if (d === 'L') tryMove(-1, 0);
+        else if (d === 'R') tryMove(1, 0);
+        else if (d === 'D') { if (tryMove(0, 1)) score++; else lock(); fall = 0; }
+        else if (d === 'U' || d === 'T') {
+          const r = rotate(cur.m);
+          for (const k of [0, -1, 1, -2, 2]) if (!collides(r, cur.x + k, cur.y)) { cur.m = r; cur.x += k; break; }
+        } else if (d === 'A') { let n = 0; while (tryMove(0, 1)) n++; score += n * 2; lock(); fall = 0; }
+      },
+      pointer() {},
+      step(dt) {
+        if (over) { overT += dt; return; }
+        if (flash > 0) { flash -= dt; if (flash <= 0) clearRows(); return; }
+        fall += dt;
+        const interval = Math.max(0.07, 0.8 - 0.07 * (level - 1));
+        while (fall >= interval && cur) { fall -= interval; if (!tryMove(0, 1)) lock(); }
+      },
+      render(g) {
+        g.clear();
+        const wall = [90, 100, 130];
+        for (let y = y0; y <= y0 + ROWS; y++) { g.set(x0 - 1, y, wall); g.set(x0 + COLS, y, wall); }
+        for (let x = x0 - 1; x <= x0 + COLS; x++) g.set(x, y0 + ROWS, wall);
+        const blink = Math.floor(flash * 20) % 2 === 1;
+        for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+          const c = board[y][x];
+          if (c) g.set(x0 + x, y0 + y, flashRows.includes(y) && blink ? COL.white : c);
+        }
+        if (cur) {
+          let gy = cur.y; while (!collides(cur.m, cur.x, gy + 1)) gy++;
+          const col = TETS[cur.k].c;
+          if (gy !== cur.y) cur.m.forEach((row, j) => row.forEach((v, i) => { if (v) g.set(x0 + cur.x + i, y0 + gy + j, dimc(col, 0.22)); }));
+          cur.m.forEach((row, j) => row.forEach((v, i) => { if (v && cur.y + j >= 0) g.set(x0 + cur.x + i, y0 + cur.y + j, col); }));
+        }
+        const nx = land ? x0 + COLS + 3 : lw - 6, ny = land ? 2 : 1;
+        TETS[nextK].m.forEach((row, j) => row.forEach((v, i) => { if (v) g.set(nx + i, ny + j, TETS[nextK].c); }));
+        if (land) { g.text(String(lines % 100), 2, 1, COL.white); g.text('L' + Math.min(level, 9), 2, 8, [255, 200, 60]); }
+        else { g.text('L' + Math.min(level, 9), 1, 1, [255, 200, 60]); const t = String(lines % 1000); g.text(t, Math.floor((lw - textWidth(t)) / 2), 6, COL.white); }
+        if (over && overT > 0.5) { g.clear(); bigScore(g, score, lw, lh); }
+      }
+    };
+  }
+
+  /* ---------- Dino koşusu ---------- */
+  function Dino(lw, lh) {
+    const gl = lh - 2, dx = 3;
+    const D1 = ['..GGG.', '..GEG.', 'G.GGGG', 'GGGGG.', '.GGG..', '.G.G..'], D2 = ['..GGG.', '..GEG.', 'G.GGGG', 'GGGGG.', '.GGG..', '..G.G.'];
+    const DUCK = ['GGGGGGG', 'GGGGGEG', '.G.G...'];
+    const CAC1 = ['.C.', 'CCC', '.C.', '.C.'], CAC2 = ['.C.', 'CCC', '.C.', '.C.', '.C.'], CAC3 = ['.C..C.', 'CCCCCC', '.C..C.', '.C..C.'];
+    const PT = [['..P..', 'PPPPP', '.P.P.'], ['P...P', '.PPP.', '..P..']];
+    let h, vh, dist, sinceSpawn, nextGap, obs, over, overT, duckT, t, clouds, speedNow;
+    function reset() {
+      h = 0; vh = 0; dist = 0; sinceSpawn = 0; nextGap = 18; obs = []; over = false; overT = 0; duckT = 0; t = 0; speedNow = 12;
+      clouds = Array.from({ length: 3 }, (_, i) => ({ x: i * Math.floor(lw / 3) + rint(4), y: 1 + rint(Math.max(1, gl - 9)) }));
+    }
+    reset();
+    const sc = () => Math.floor(dist / 6);
+    function spawn() {
+      sinceSpawn = 0; nextGap = 14 + Math.random() * 12 + speedNow * 0.4;
+      const r = Math.random();
+      if (sc() >= 6 && r < 0.3) obs.push({ x: lw, rows: PT, w: 5, hgt: 3, top: gl - 6, type: 'p' });
+      else if (r < 0.6) obs.push({ x: lw, rows: [CAC1], w: 3, hgt: 4, top: gl - 4, type: 'c' });
+      else if (r < 0.85) obs.push({ x: lw, rows: [CAC2], w: 3, hgt: 5, top: gl - 5, type: 'c' });
+      else obs.push({ x: lw, rows: [CAC3], w: 6, hgt: 4, top: gl - 4, type: 'c' });
+    }
+    function hitTest() {
+      const ducking = h === 0 && duckT > 0;
+      const c0 = dx + 1, c1 = ducking ? dx + 5 : dx + 4;
+      const r0 = ducking ? gl - 3 : gl - 6 - Math.round(h) + 1, r1 = ducking ? gl - 1 : gl - 6 - Math.round(h) + 5;
+      for (const o of obs) {
+        const o0 = Math.floor(o.x), o1 = o0 + o.w - 1;
+        if (c1 >= o0 && c0 <= o1 && r1 >= o.top && r0 <= o.top + o.hgt - 1) return true;
+      }
+      return false;
+    }
+    return {
+      info: () => 'Skor ' + sc(),
+      get score() { return sc(); },
+      dir(d) {
+        if (over) { if (overT > 0.8) reset(); return; }
+        if (d === 'A' || d === 'U' || d === 'T') { if (h === 0) vh = 38; }
+        else if (d === 'D') { duckT = 0.3; if (h > 0) vh = -45; }
+      },
+      pointer() {},
+      step(dt) {
+        if (over) { overT += dt; return; }
+        t += dt;
+        speedNow = Math.min(26, 12 + sc() * 0.25);
+        dist += speedNow * dt; sinceSpawn += speedNow * dt;
+        if (h > 0 || vh > 0) { h += vh * dt; vh -= 100 * dt; if (h <= 0) { h = 0; vh = 0; } }
+        duckT = Math.max(0, duckT - dt);
+        if (sinceSpawn >= nextGap) spawn();
+        for (const o of obs) o.x -= (speedNow + (o.type === 'p' ? 3 : 0)) * dt;
+        obs = obs.filter(o => o.x > -8);
+        for (const c of clouds) { c.x -= speedNow * 0.12 * dt; if (c.x < -5) { c.x = lw + rint(6); c.y = 1 + rint(Math.max(1, gl - 9)); } }
+        if (hitTest()) { over = true; overT = 0; }
+      },
+      render(g) {
+        g.clear();
+        for (const c of clouds) spr(g, ['.WW.', 'WWWW'], Math.round(c.x), c.y, { W: [45, 55, 100] });
+        for (let x = 0; x < lw; x++) { g.set(x, gl, [150, 105, 50]); if ((x + Math.floor(dist)) % 6 === 0) g.set(x, gl + 1, [100, 70, 35]); }
+        for (const o of obs) {
+          const rows = o.type === 'p' ? PT[Math.floor(t * 6) % 2] : o.rows[0];
+          spr(g, rows, Math.floor(o.x), o.top, { C: [30, 190, 70], P: [200, 100, 255] });
+        }
+        const dead = over, pal = { G: dead ? COL.red : [80, 230, 110], E: COL.white };
+        if (h === 0 && duckT > 0) spr(g, DUCK, dx, gl - 3, pal);
+        else spr(g, h > 0 || Math.floor(t * 8) % 2 === 0 ? D1 : D2, dx, gl - 6 - Math.round(h), pal);
+        const s = String(sc()); g.text(s, lw - textWidth(s) - 1, 1, [200, 200, 210]);
+        if (over && overT > 0.6) { g.clear(); bigScore(g, sc(), lw, lh); }
+      }
+    };
+  }
+
+  /* ---------- Uzay savaşı ---------- */
+  function Space(lw, lh) {
+    const ax = axes(lw, lh), A = ax.A, B = ax.B;
+    const COLS = Math.max(2, Math.floor((B - 4) / 4)), ROWS = A >= 28 ? 4 : 3, TOTAL = COLS * ROWS;
+    const RC = [COL.purple, COL.pink, COL.cyan, COL.yellow], FR = [['X.X', 'XXX'], ['.X.', 'XXX']];
+    let enemies, fb, fa, dirB, moveT, frame, sb, pbul, ebul, boom, lives, score, level, over, overT, fireCd, shootT, hold, inv, waveWait, t;
+    function wave() {
+      enemies = [];
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) enemies.push({ c, r, alive: true });
+      fb = Math.floor((B - (COLS * 4 - 1)) / 2); fa = A - 3 * ROWS - 1; dirB = 1; moveT = 0; frame = 0; pbul = []; ebul = []; waveWait = 0.8; shootT = 1;
+    }
+    function reset() { sb = Math.floor(B / 2); boom = []; lives = 3; score = 0; level = 1; over = false; overT = 0; fireCd = 0; hold = false; inv = 0; t = 0; wave(); }
+    reset();
+    function fire() { if (fireCd > 0 || pbul.length >= 3 || over) return; pbul.push({ a: 2, b: sb }); fireCd = 0.28; }
+    function advance(alive) {
+      let minC = COLS, maxC = 0;
+      for (const e of alive) { minC = Math.min(minC, e.c); maxC = Math.max(maxC, e.c); }
+      const left = fb + minC * 4, right = fb + maxC * 4 + 2;
+      if ((dirB > 0 && right + 1 >= B) || (dirB < 0 && left - 1 < 0)) { fa -= 1; dirB = -dirB; } else fb += dirB;
+    }
+    return {
+      info: () => 'Skor ' + score + ' · Can ' + lives,
+      get score() { return score; },
+      dir(d) {
+        if (over) { if (overT > 0.8) reset(); return; }
+        if (d === 'U' || d === 'L') sb = clamp(sb - 1, 1, B - 2);
+        else if (d === 'D' || d === 'R') sb = clamp(sb + 1, 1, B - 2);
+        else if (d === 'A') fire();
+      },
+      pointer(x, y, phase) {
+        if (over) { if (phase === 'down' && overT > 0.8) reset(); return; }
+        if (phase === 'up') { hold = false; return; }
+        sb = clamp(Math.round((ax.land ? y : x) - 0.5), 1, B - 2);
+        if (phase === 'down') { hold = true; fire(); }
+      },
+      step(dt) {
+        if (over) { overT += dt; return; }
+        t += dt;
+        for (const b of boom) b.t -= dt;
+        boom = boom.filter(b => b.t > 0);
+        fireCd -= dt; inv = Math.max(0, inv - dt);
+        if (hold && fireCd <= 0) fire();
+        if (waveWait > 0) { waveWait -= dt; return; }
+        let alive = enemies.filter(e => e.alive);
+        if (!alive.length) { level++; wave(); return; }
+        moveT -= dt;
+        const interval = Math.max(0.1, (0.6 - 0.04 * (level - 1)) * alive.length / TOTAL);
+        if (moveT <= 0) { moveT = interval; frame ^= 1; advance(alive); }
+        for (const b of pbul) b.a += 26 * dt;
+        for (const b of ebul) b.a -= 11 * dt;
+        pbul = pbul.filter(b => b.a < A); ebul = ebul.filter(b => b.a > -1);
+        for (const b of pbul) for (const e of alive) {
+          if (!e.alive || b.dead) continue;
+          const ea = fa + e.r * 3, eb = fb + e.c * 4, ba = Math.floor(b.a), bbb = Math.round(b.b);
+          if (ba >= ea && ba <= ea + 1 && bbb >= eb && bbb <= eb + 2) { e.alive = false; b.dead = true; score += 10 * (ROWS - e.r); boom.push({ a: ea, b: eb + 1, t: 0.18 }); }
+        }
+        pbul = pbul.filter(b => !b.dead);
+        alive = enemies.filter(e => e.alive);
+        shootT -= dt;
+        if (shootT <= 0 && alive.length) {
+          shootT = Math.max(0.4, (1.4 - 0.1 * level) * (0.6 + Math.random() * 0.8));
+          const col = alive[rint(alive.length)].c;
+          const low = alive.filter(e => e.c === col).sort((p, q) => p.r - q.r)[0];
+          ebul.push({ a: fa + low.r * 3 - 1, b: fb + low.c * 4 + 1 });
+        }
+        for (const b of ebul) {
+          const ba = Math.floor(b.a);
+          if (ba >= 0 && ba <= 1 && Math.abs(Math.round(b.b) - sb) <= 1 && inv <= 0) {
+            b.dead = true; lives--; inv = 1.2; boom.push({ a: 0, b: sb, t: 0.3 });
+            if (lives <= 0) { over = true; overT = 0; }
+          }
+        }
+        ebul = ebul.filter(b => !b.dead);
+        if (fa <= 3) { over = true; overT = 0; }
+      },
+      render(g) {
+        g.clear();
+        for (const e of enemies) if (e.alive) {
+          const ea = fa + e.r * 3, eb = fb + e.c * 4;
+          FR[frame].forEach((row, j) => { for (let i = 0; i < 3; i++) if (row[i] === 'X') ax.put(g, ea + j, eb + i, RC[e.r]); });
+        }
+        if (inv <= 0 || Math.floor(t * 10) % 2 === 0) {
+          for (let i = -1; i <= 1; i++) ax.put(g, 0, sb + i, COL.green);
+          ax.put(g, 1, sb, [170, 255, 170]);
+        }
+        for (const b of pbul) { ax.put(g, Math.floor(b.a), Math.round(b.b), COL.yellow); ax.put(g, Math.floor(b.a) - 1, Math.round(b.b), [120, 100, 20]); }
+        for (const b of ebul) ax.put(g, Math.floor(b.a), Math.round(b.b), COL.red);
+        for (const b of boom) { ax.put(g, b.a, b.b, COL.white); ax.put(g, b.a + 1, b.b - 1, COL.orange); ax.put(g, b.a + 1, b.b + 1, COL.orange); }
+        for (let i = 0; i < lives; i++) ax.put(g, A - 1, i, COL.green);
+        if (over && overT > 0.6) { g.clear(); bigScore(g, score, lw, lh); }
+      }
+    };
+  }
+
+  /* ---------- Araba kaçışı ---------- */
+  function Car(lw, lh) {
+    const ax = axes(lw, lh), A = ax.A, B = ax.B, LANES = 3, laneW = Math.max(3, Math.floor((B - 4) / LANES));
+    const off = Math.floor((B - laneW * LANES) / 2), laneC = i => off + i * laneW + (laneW >> 1);
+    const CARC = [COL.yellow, COL.blue, COL.purple, COL.orange, COL.cyan];
+    const ME = ['R.R', 'RRR', 'RWR', '.R.'];          // arkadan öne
+    const OTHER = ['.X.', 'XWX', 'XXX', 'X.X'];        // önden arkaya (oyuncuya dönük)
+    let lane, pb, cars, sinceSpawn, nextGap, dist, over, overT, score, speed, t;
+    function reset() { lane = 1; pb = laneC(1); cars = []; sinceSpawn = 0; nextGap = 12; dist = 0; over = false; overT = 0; score = 0; speed = 14; t = 0; }
+    reset();
+    function spawn() {
+      sinceSpawn = 0; nextGap = 11 + Math.random() * 6;
+      const two = score >= 5 && Math.random() < 0.35, first = rint(LANES), color = CARC[rint(CARC.length)];
+      cars.push({ a: A, lane: first, color });
+      if (two) { const second = (first + 1 + rint(LANES - 1)) % LANES; cars.push({ a: A, lane: second, color: CARC[rint(CARC.length)] }); }
+    }
+    return {
+      info: () => 'Skor ' + score,
+      get score() { return score; },
+      dir(d) {
+        if (over) { if (overT > 0.8) reset(); return; }
+        if (d === 'U' || d === 'L') lane = Math.max(0, lane - 1);
+        else if (d === 'D' || d === 'R') lane = Math.min(LANES - 1, lane + 1);
+      },
+      pointer() {},
+      step(dt) {
+        t += dt;
+        if (over) { overT += dt; return; }
+        speed = 14 + Math.min(16, score * 0.8);
+        dist += speed * dt; sinceSpawn += speed * dt;
+        const tgt = laneC(lane), mv = 40 * dt; pb += Math.abs(tgt - pb) < mv ? tgt - pb : Math.sign(tgt - pb) * mv;
+        if (sinceSpawn >= nextGap) spawn();
+        for (const c of cars) c.a -= speed * dt;
+        const before = cars.length; cars = cars.filter(c => c.a + 3 >= 0); score += before - cars.length;
+        const me = Math.round(pb);
+        for (const c of cars) if (Math.floor(c.a) <= 3 && Math.floor(c.a) + 3 >= 0 && Math.abs(laneC(c.lane) - me) <= 2) { over = true; overT = 0; }
+      },
+      render(g) {
+        g.clear();
+        const sh = Math.floor(dist);
+        for (let a = 0; a < A; a++) {
+          for (let b = 0; b < B; b++) {
+            let c = null;
+            if (b < off - 1 || b > off + laneW * LANES) c = [10, 90, 30];
+            else if (b === off - 1 || b === off + laneW * LANES) c = ((a + sh) % 4 < 2) ? COL.white : COL.red;
+            else c = [18, 20, 30];
+            ax.put(g, a, b, c);
+          }
+          for (let i = 1; i < LANES; i++) if ((a + sh) % 4 < 2) ax.put(g, a, off + i * laneW, [180, 180, 190]);
+        }
+        const pal = { R: over ? COL.orange : COL.red, W: COL.cyan };
+        const me = Math.round(pb);
+        ME.forEach((row, j) => { for (let i = 0; i < 3; i++) if (row[i] !== '.') ax.put(g, j, me - 1 + i, pal[row[i]]); });
+        for (const c of cars) {
+          const cb = laneC(c.lane), top = Math.floor(c.a);
+          OTHER.forEach((row, j) => { for (let i = 0; i < 3; i++) if (row[i] !== '.') ax.put(g, top + j, cb - 1 + i, row[i] === 'W' ? COL.white : c.color); });
+        }
+        if (over && overT > 0.6) { g.clear(); bigScore(g, score, lw, lh); }
+      }
+    };
+  }
+
+  /* ---------- Simon (hafıza) ---------- */
+  function Simon(lw, lh) {
+    const land = lw >= lh, PADC = [COL.red, COL.yellow, COL.green, COL.blue];
+    const padLen = Math.floor(((land ? lw : lh) - 3) / 4), start = Math.floor(((land ? lw : lh) - (padLen * 4 + 3)) / 2);
+    const rect = i => land ? { x: start + i * (padLen + 1), y: 2, w: padLen, h: lh - 3 } : { x: 2, y: start + i * (padLen + 1), w: lw - 3, h: padLen };
+    let seq, state, showI, showT, lit, litT, inputI, wait, score, overT, failT;
+    function reset() { seq = [rint(4)]; state = 'wait'; wait = 0.8; showI = 0; showT = 0; lit = -1; litT = 0; inputI = 0; score = 0; overT = 0; failT = 0; }
+    reset();
+    function press(i) {
+      if (state !== 'input') return;
+      lit = i; litT = 0.25;
+      if (seq[inputI] === i) {
+        inputI++;
+        if (inputI === seq.length) { score = seq.length; state = 'wait'; wait = 0.7; seq.push(rint(4)); showI = 0; showT = 0; }
+      } else { state = 'fail'; failT = 0; overT = 0; }
+    }
+    const map = land ? { L: 0, U: 1, D: 2, R: 3 } : { U: 0, L: 1, R: 2, D: 3 };
+    return {
+      info: () => 'Tur ' + score,
+      get dbg() { return { seq, state, inputI }; },
+      get score() { return score; },
+      dir(d) {
+        if (state === 'over') { if (overT > 0.8) reset(); return; }
+        if (map[d] !== undefined) press(map[d]);
+      },
+      pointer(x, y, phase) {
+        if (phase !== 'down') return;
+        if (state === 'over') { if (overT > 0.8) reset(); return; }
+        const c = land ? x : y;
+        press(clamp(Math.floor((c - start) / (padLen + 1)), 0, 3));
+      },
+      step(dt) {
+        if (state === 'wait') { wait -= dt; if (wait <= 0) { state = 'show'; showI = 0; showT = 0; } }
+        else if (state === 'show') {
+          showT += dt;
+          if (showT < 0.45) lit = seq[showI];
+          else if (showT < 0.63) lit = -1;
+          else { showT = 0; showI++; lit = -1; if (showI >= seq.length) { state = 'input'; inputI = 0; } }
+        } else if (state === 'input') { litT -= dt; if (litT <= 0) lit = -1; }
+        else if (state === 'fail') { failT += dt; overT = 0; if (failT > 1.1) { state = 'over'; overT = 0; } }
+        else if (state === 'over') overT += dt;
+      },
+      render(g) {
+        g.clear();
+        if (state === 'over') { bigScore(g, score, lw, lh); return; }
+        for (let i = 0; i < 4; i++) {
+          const r = rect(i);
+          let c = dimc(PADC[i], 0.3);
+          if (state === 'fail') c = Math.floor(failT * 6) % 2 === 0 ? COL.red : dimc(COL.red, 0.25);
+          else if (lit === i) c = PADC[i];
+          g.rect(r.x, r.y, r.w, r.h, c);
+          if (state !== 'fail' && lit === i) g.rect(r.x + Math.floor(r.w / 2) - 1, r.y + Math.floor(r.h / 2) - 1, 2, 2, COL.white);
+        }
+        for (let i = 0; i < seq.length - (state === 'input' || state === 'show' ? 0 : 1) && i < (land ? lw : lh); i++) {
+          const c = i < inputI && state === 'input' ? COL.white : [50, 55, 75];
+          if (land) g.set(i, 0, c); else g.set(0, i, c);
+        }
+      }
+    };
+  }
+
+  return { SERVICE, WRITE, NOTIFY, PANELS, frameSizeFor, handshake, brightness, diy, liveFrames, splitWrites, parseNotify, same,
+    SnakeArt, BreakoutArt, Pong, Flappy, Tetris, Dino, Space, Car, Simon,
+    crc32, storePackets, gifEncode, bannerFrames, scrollFrames, dither332, clockMode, defaultMode, programList, eraseBuffers,
+    logicalSize, mapPixel, toDeviceRGB, hsv, FONT, normalize, textWidth, Gfx, Effect, TextScroll, Draw, Clock, CLOCK_DEFAULTS,
+    decodeDrawing, placeDrawing, Inbox };
+})();
+/*CORE_END*/
+
+/* ---------- Sayfa ---------- */
+(() => {
+  const $ = id => document.getElementById(id);
+  const CELL = 24;
+  const view = $('view'), ctx = view.getContext('2d');
+  let W = 32, H = 16, panelCode = 0x82, rot = 0, lw = 32, lh = 16, g, app;
+  let tab = 'fx', fxKind = 'plasma';
+  const ALLKEYS = ['L', 'R', 'U', 'D', 'A', 'T'];
+  const MODES = {
+    fx: { touch: 'none' }, inbox: { touch: 'none' }, clock: { touch: 'none' }, test: { touch: 'none' }, lib: { touch: 'none' }, text: { touch: 'none' }, draw: { touch: 'drag' },
+    snake: { touch: 'swipe', pad: true, hint: 'Parmağını kaydır ya da okları kullan. Öldüğünde dokun, yeniden başlasın.' },
+    brick: { touch: 'drag', pad: true, hint: 'Parmağını sürükleyerek ya da sol ve sağ okla tabanı oynat.' },
+    pong: { touch: 'drag', pad: true, hint: 'Parmağını sürükle ya da oklara bas. İlk 5 sayıyı yapan kazanır.' },
+    flappy: { touch: 'tap', pad: true, a: true, noRepeat: ALLKEYS, hint: 'Önizlemeye dokun ya da A\'ya bas: kuş zıplar. Borulardan geç.' },
+    tetris: { touch: 'swipe', pad: true, a: true, noRepeat: ['A', 'U', 'T'], hint: 'Kaydır: sola, sağa, aşağı. Dokun ya da yukarı: döndür. A: hızlı düşür.' },
+    dino: { touch: 'tap', pad: true, a: true, noRepeat: ['A', 'U', 'T'], hint: 'Dokun ya da A: zıpla. Aşağı: eğil. Kuşların altından eğilerek geç.' },
+    space: { touch: 'drag', pad: true, a: true, hint: 'Parmağını sürükle: gemi gelir ve ateş eder. Oklar ve A de çalışır.' },
+    car: { touch: 'swipe', pad: true, noRepeat: ALLKEYS, hint: 'Şerit değiştirmek için kaydır ya da oklara bas.' },
+    simon: { touch: 'drag', pad: true, noRepeat: ALLKEYS, hint: 'Yanan renklerin sırasını aklında tut, sonra renklere dokun ya da oklara bas.' }
+  };
+  let textColor = [255, 160, 40], drawColor = [255, 255, 255];
+  // Gelen kutusu durumu (aşağıdaki fonksiyonlardan önce tanımlı olmalı)
+  let drawSeed = null, inboxFit = 'zoom', inboxAuto = true, inboxItems = [], inboxSel = null, inboxSeen = new Set();
+  let inboxSha = null, inboxEtag = null, inboxTimer = null, inboxBusy = false, inboxBlockedUntil = 0;
+  const inboxCache = new Map(), REPO_RE = /^[\w.-]+\/[\w.-]+$/;
+  try { inboxSeen = new Set(JSON.parse(localStorage.getItem('ledInboxSeen') || '[]')); } catch (e) {}
+  try {
+    const j = JSON.parse(localStorage.getItem('ledInboxCfg') || 'null');
+    if (j) {
+      if (j.fit === 'center' || j.fit === 'zoom') inboxFit = j.fit;
+      if (typeof j.auto === 'boolean') inboxAuto = j.auto;
+      if (typeof j.repo === 'string' && REPO_RE.test(j.repo)) $('inboxRepo').value = j.repo;
+    }
+  } catch (e) {}
+  function inboxCurrent() { return inboxItems.find(it => it.id === inboxSel && it.d) || null; }
+  const PALETTE = [[255,255,255],[255,60,60],[255,160,40],[255,230,60],[70,220,100],[60,200,255],[110,110,255],[255,90,200],[0,0,0]];
+  const CLK_PAL = [[70,240,255],[255,60,200],[170,255,60],[255,230,60],[255,120,30],[255,60,60],[160,100,255],[30,110,255],[255,255,255],[0,0,0]];
+  const clockCfg = Core.CLOCK_DEFAULTS();
+  try {
+    const j = JSON.parse(localStorage.getItem('ledClock2') || 'null');
+    if (j) {
+      for (const k of ['style', 'text']) if (typeof j[k] === 'string') clockCfg[k] = j[k];
+      if (j.scale === 1 || j.scale === 2) clockCfg.scale = j.scale;
+      for (const k of ['sec', 'date', 'name', 'h24', 'blink', 'rain']) if (typeof j[k] === 'boolean') clockCfg[k] = j[k];
+      if (j.colors) for (const k in clockCfg.colors) if (Array.isArray(j.colors[k]) && j.colors[k].length === 3) clockCfg.colors[k] = j.colors[k].map(Number);
+    }
+  } catch (e) {}
+  const saveClockCfg = () => { try { localStorage.setItem('ledClock2', JSON.stringify(clockCfg)); } catch (e) {} };
+
+  try { const r = Number(localStorage.getItem('ledRot')); if (r >= 0 && r <= 3) { rot = r; $('rot').value = String(r); } } catch (e) {}
+
+  function makeApp() {
+    if (tab === 'fx') app = Core.Effect(fxKind, lw, lh);
+    else if (tab === 'snake') app = Core.SnakeArt(lw, lh);
+    else if (tab === 'brick') app = Core.BreakoutArt(lw, lh);
+    else if (tab === 'clock') app = Core.Clock(lw, lh, { cfg: clockCfg });
+    else if (tab === 'pong') app = Core.Pong(lw, lh);
+    else if (tab === 'flappy') app = Core.Flappy(lw, lh);
+    else if (tab === 'tetris') app = Core.Tetris(lw, lh);
+    else if (tab === 'dino') app = Core.Dino(lw, lh);
+    else if (tab === 'space') app = Core.Space(lw, lh);
+    else if (tab === 'car') app = Core.Car(lw, lh);
+    else if (tab === 'simon') app = Core.Simon(lw, lh);
+    else if (tab === 'test' || tab === 'lib') app = Core.Effect('plasma', lw, lh);
+    else if (tab === 'inbox') { app = Core.Inbox(lw, lh); app.setFit(inboxFit); const it = inboxCurrent(); if (it) app.show(it.d); }
+    else if (tab === 'text') app = Core.TextScroll(lw, lh, { text: $('txt').value, color: textColor, speed: Number($('txtSpeed').value) });
+    else { app = Core.Draw(lw, lh); app.setColor(drawColor); if (drawSeed) { if (drawSeed.length === lw * lh * 3) app.load(drawSeed); drawSeed = null; } }
+    $('ctl-fx').hidden = tab !== 'fx';
+    const md = MODES[tab] || {};
+    $('ctl-game').hidden = !md.pad; $('btnA').hidden = !md.a;
+    $('ctl-clock').hidden = tab !== 'clock'; $('ctl-test').hidden = tab !== 'test'; $('ctl-lib').hidden = tab !== 'lib';
+    $('ctl-text').hidden = tab !== 'text'; $('ctl-inbox').hidden = tab !== 'inbox';
+    $('ctl-draw').hidden = tab !== 'draw';
+    $('gameHint').textContent = md.hint || '';
+    document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
+  }
+  function setup() {
+    [lw, lh] = Core.logicalSize(rot, W, H);
+    g = new Core.Gfx(lw, lh);
+    view.width = lw * CELL; view.height = lh * CELL;
+    makeApp();
+  }
+
+  /* --- çizim ve döngü --- */
+  function paint() {
+    ctx.fillStyle = '#080b0f'; ctx.fillRect(0, 0, view.width, view.height);
+    const r = CELL * 0.4, b = g.buf;
+    for (let y = 0; y < lh; y++) for (let x = 0; x < lw; x++) {
+      const i = (y * lw + x) * 3, R = b[i], G = b[i + 1], B = b[i + 2];
+      const off = R + G + B < 8;
+      ctx.fillStyle = off ? 'rgba(255,255,255,0.07)' : 'rgb(' + R + ',' + G + ',' + B + ')';
+      ctx.beginPath(); ctx.arc((x + .5) * CELL, (y + .5) * CELL, off ? r * .55 : r, 0, 6.2832); ctx.fill();
+    }
+  }
+  let prev = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - prev) / 1000); prev = now;
+    app.step(dt); app.render(g); paint();
+    if (tab === 'draw') drawSnap = { buf: Uint8Array.from(g.buf), lw, lh };
+    requestAnimationFrame(frame);
+  }
+
+  /* --- Bluetooth --- */
+  let dev = null, wr = null, nt = null, connected = false, pumping = false;
+  let ackWaiter = null, hsWaiter = null, txChain = Promise.resolve(), sent = 0, sentMark = 0, lastRGB = null, lastSend = 0;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  function setStatus(msg, kind) {
+    $('statusText').textContent = msg;
+    $('dot').className = 'dot' + (kind ? ' ' + kind : '');
+  }
+  function showErr(msg) { const e = $('errBox'); e.textContent = msg || ''; e.hidden = !msg; }
+
+  function onNotify(ev) {
+    const dv = ev.target.value, b = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+    if (noteSink) noteSink(b);
+    if (!(b.length === 5 && b[2] === 0 && b[3] === 0 && b[4] === 1)) logLine('←', hex(b), true);
+    for (const h of rxHooks.slice()) h(b);
+    const m = Core.parseNotify(b);
+    if (!m) return;
+    if (m.cmd === 0x8001) lastHs = hex(b);
+    if (m.cmd === 0x8001 && hsWaiter) { hsWaiter(m); hsWaiter = null; }
+    else if (m.cmd === 0x0000 && ackWaiter) { ackWaiter(m.status === 1 || m.status === 3); ackWaiter = null; }
+  }
+  async function writeRaw(p) {
+    for (const part of Core.splitWrites(p)) {
+      if (wr.writeValueWithoutResponse) await wr.writeValueWithoutResponse(part);
+      else if (wr.writeValueWithResponse) await wr.writeValueWithResponse(part);
+      else await wr.writeValue(part);
+    }
+  }
+  function send(p) { txChain = txChain.catch(() => {}).then(() => writeRaw(p)); return txChain; }
+
+  async function sendFrame(rgb) {
+    for (const f of Core.liveFrames(rgb, Core.frameSizeFor(panelCode))) {
+      const ack = new Promise(res => { ackWaiter = res; setTimeout(() => res(null), 700); });
+      await send(f);
+      await ack;
+    }
+  }
+  async function pump() {
+    if (pumping) return; pumping = true;
+    try {
+      while (connected) {
+        if (hold) { await sleep(40); continue; }
+        const rgb = Core.toDeviceRGB(g.buf, lw, lh, rot, W, H), now = performance.now();
+        if (lastRGB && Core.same(rgb, lastRGB) && now - lastSend < 1200) { await sleep(25); continue; }
+        lastRGB = rgb; lastSend = now;
+        await sendFrame(rgb); sent++;
+        await sleep(8);
+      }
+    } catch (e) {
+      if (connected) { showErr('Gönderim durdu: ' + e.message); }
+    } finally { pumping = false; }
+  }
+  let drawSnap = null, noteSink = null, hold = false, lastHs = '';
+  const rxHooks = [];
+  const logLines = [];
+  function logLine(dir, text, rx) {
+    const el = document.getElementById('logBox'); if (!el) return;
+    logLines.push((performance.now() / 1000).toFixed(2).padStart(7) + ' ' + dir + ' ' + text); if (logLines.length > 600) logLines.shift();
+    el.value = logLines.join('\n'); el.scrollTop = el.scrollHeight;
+  }
+  function onDisconnected() {
+    connected = false; hold = false; ackWaiter = null; txChain = Promise.resolve(); lastRGB = null;
+    setStatus('Bağlantı kesildi, önizleme çalışıyor');
+    $('btnConnect').textContent = 'Panele bağlan'; $('fps').textContent = '';
+  }
+
+  async function connect(all) {
+    showErr('');
+    if (!navigator.bluetooth) { setStatus('Web Bluetooth yok', 'bad'); showErr('Bu tarayıcı Web Bluetooth desteklemiyor. Android\'de Chrome ile aç.'); return; }
+    try {
+      setStatus('Panel aranıyor…');
+      const optional = [Core.SERVICE];
+      const opts = all ? { acceptAllDevices: true, optionalServices: optional }
+                       : { filters: [{ namePrefix: 'LED_BLE' }], optionalServices: optional };
+      dev = await navigator.bluetooth.requestDevice(opts);
+      dev.addEventListener('gattserverdisconnected', onDisconnected);
+      setStatus('Bağlanıyor…');
+      const server = await dev.gatt.connect();
+      const svc = await server.getPrimaryService(Core.SERVICE);
+      wr = await svc.getCharacteristic(Core.WRITE); nt = await svc.getCharacteristic(Core.NOTIFY);
+      await nt.startNotifications();
+      nt.addEventListener('characteristicvaluechanged', onNotify);
+      const hs = new Promise(res => { hsWaiter = res; setTimeout(() => res(null), 2500); });
+      await send(Core.handshake(new Date()));
+      const info = await hs;
+      let note = '';
+      if (info) {
+        panelCode = info.panel;
+        const d = Core.PANELS[info.panel];
+        if (d) { W = d[0]; H = d[1]; } else note = 'Panel kodu 0x' + info.panel.toString(16) + ' tanınmadı, ' + W + '×' + H + ' varsayıldı.';
+        if (info.pin) note = 'Panelde parola açık. Uygulamadan parolayı kapatman gerekebilir.';
+      } else note = 'Panel el sıkışmaya yanıt vermedi, ' + W + '×' + H + ' varsayıldı.';
+      connected = true;
+      await send(Core.diy(1));
+      setup();
+      setStatus((dev.name || 'Panel') + ' · ' + W + '×' + H, 'on');
+      $('btnConnect').textContent = 'Bağlantıyı kes';
+      showErr(note);
+      sentMark = sent; pump();
+    } catch (e) {
+      connected = false;
+      setStatus('Bağlanılamadı', 'bad');
+      if (e && e.name === 'NotFoundError') showErr('Cihaz seçilmedi. Telefondaki panel uygulamasını tamamen kapat ve tekrar dene.');
+      else if (e && (e.name === 'SecurityError' || e.name === 'NotAllowedError')) showErr('Tarayıcı bu sayfada Bluetooth\'a izin vermedi (' + e.name + '). Sayfayı doğrudan Chrome\'da, kendi sekmesinde aç.');
+      else showErr('Hata: ' + (e && e.message ? e.message : e));
+    }
+  }
+  async function disconnect() {
+    try { connected = false; await sleep(60); if (wr) await wr.writeValueWithResponse(Core.diy(0)); } catch (e) {}
+    try { if (dev && dev.gatt.connected) dev.gatt.disconnect(); } catch (e) {}
+    onDisconnected();
+  }
+
+  /* --- arayüz bağlantıları --- */
+  $('btnConnect').addEventListener('click', () => connected ? disconnect() : connect(false));
+  $('btnAll').addEventListener('click', () => { if (!connected) connect(true); });
+  $('rot').addEventListener('change', e => {
+    rot = Number(e.target.value); try { localStorage.setItem('ledRot', String(rot)); } catch (x) {}
+    setup(); lastRGB = null;
+  });
+  let briTimer = null;
+  $('bri').addEventListener('input', e => {
+    $('briVal').textContent = e.target.value; clearTimeout(briTimer);
+    briTimer = setTimeout(() => { if (connected) send(Core.brightness(Number(e.target.value))).catch(() => {}); }, 150);
+  });
+  const TABCAT = {};
+  document.querySelectorAll('.tab').forEach(b => { TABCAT[b.dataset.tab] = b.dataset.cat; });
+  const lastTab = { gorsel: 'clock', oyun: 'snake', hafiza: 'lib', arac: 'test' };
+  function updateNav() {
+    const cat = TABCAT[tab] || 'gorsel';
+    document.querySelectorAll('.cat').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cat === cat)));
+    let count = 0;
+    document.querySelectorAll('.tab').forEach(b => { const on = b.dataset.cat === cat; b.hidden = !on; if (on) count++; });
+    $('subtabs').hidden = count < 2;
+  }
+  function selectTab(t) { tab = t; lastTab[TABCAT[t]] = t; makeApp(); updateNav(); if (t === 'inbox') inboxMarkSeen(); }
+  document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => selectTab(b.dataset.tab)));
+  document.querySelectorAll('.cat').forEach(b => b.addEventListener('click', () => selectTab(lastTab[b.dataset.cat])));
+  document.querySelectorAll('[data-fx]').forEach(b => b.addEventListener('click', () => {
+    fxKind = b.dataset.fx; document.querySelectorAll('[data-fx]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); makeApp();
+  }));
+  function swatches(root, onPick, initial, pal) {
+    (pal || PALETTE).forEach(c => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'sw';
+      b.style.background = 'rgb(' + c + ')'; b.setAttribute('aria-label', 'Renk ' + c.join(','));
+      b.setAttribute('aria-pressed', String(c.join() === initial.join()));
+      b.addEventListener('click', () => { root.querySelectorAll('.sw').forEach(x => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); onPick(c); });
+      root.appendChild(b);
+    });
+  }
+  swatches($('txtColors'), c => { textColor = c.join() === '0,0,0' ? [255, 255, 255] : c; if (tab === 'text') app.setColor(textColor); }, textColor);
+  [['clkTime', 'time'], ['clkDate', 'date'], ['clkName', 'name'], ['clkRain', 'rain']].forEach(([id, k]) => swatches($(id), c => {
+    clockCfg.colors[k] = c.slice(); if (tab === 'clock') app.setCfg({ colors: { [k]: c } }); saveClockCfg();
+  }, clockCfg.colors[k], CLK_PAL));
+  const syncClockUI = () => {
+    document.querySelectorAll('#ctl-clock [data-k]').forEach(b => b.setAttribute('aria-pressed', String(String(clockCfg[b.dataset.k]) === b.dataset.v)));
+    document.querySelectorAll('#ctl-clock [data-t]').forEach(b => b.setAttribute('aria-pressed', String(!!clockCfg[b.dataset.t])));
+    $('clkText').value = clockCfg.text;
+  };
+  document.querySelectorAll('#ctl-clock [data-k]').forEach(b => b.addEventListener('click', () => {
+    clockCfg[b.dataset.k] = b.dataset.k === 'scale' ? Number(b.dataset.v) : b.dataset.v; saveClockCfg(); syncClockUI(); if (tab === 'clock') app.setCfg(clockCfg);
+  }));
+  document.querySelectorAll('#ctl-clock [data-t]').forEach(b => b.addEventListener('click', () => {
+    clockCfg[b.dataset.t] = !clockCfg[b.dataset.t]; saveClockCfg(); syncClockUI(); if (tab === 'clock') app.setCfg(clockCfg);
+  }));
+  $('clkText').addEventListener('input', e => { clockCfg.text = e.target.value; saveClockCfg(); if (tab === 'clock') app.setCfg({ text: e.target.value }); });
+  syncClockUI();
+
+  const hex = b => Array.from(b, x => x.toString(16).padStart(2, '0')).join(' ');
+  async function saveToPanel(mode) {
+    showErr('');
+    if (!connected) { showErr('Önce panele bağlan.'); return; }
+    if (!clockCfg.text.trim()) { showErr('İsim yazısı boş.'); return; }
+    $('btnSaveGif').disabled = $('btnSavePng').disabled = true;
+    const replies = []; noteSink = b => replies.push(hex(b));
+    try {
+      let type, data;
+      const frames = Core.bannerFrames(W, H, clockCfg.text, { name: clockCfg.colors.name, rain: clockCfg.colors.rain }, 32);
+      if (mode === 'gif') { type = 0x0003; data = Core.gifEncode(frames, W, H, 8); }
+      else {
+        const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+        const c2 = cv.getContext('2d'), im = c2.createImageData(W, H), f = frames[8];
+        for (let i = 0; i < W * H; i++) { im.data[i * 4] = f[i * 3]; im.data[i * 4 + 1] = f[i * 3 + 1]; im.data[i * 4 + 2] = f[i * 3 + 2]; im.data[i * 4 + 3] = 255; }
+        c2.putImageData(im, 0, 0);
+        const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+        type = 0x0002; data = new Uint8Array(await blob.arrayBuffer());
+      }
+      hold = true; setStatus('Panele kaydediliyor…'); await sleep(900);
+      await send(Core.diy(0)); await sleep(250);
+      for (const pk of Core.storePackets(type, data, 1)) { await send(pk); await sleep(120); }
+      await sleep(1500);
+      noteSink = null;
+      const info = 'Gönderildi (' + data.length + ' bayt, ' + (mode === 'gif' ? 'GIF' : 'PNG') + '). Panel yanıtı: ' + (replies.length ? replies.join(' | ') : 'yok') + '. Şimdi bağlantı kapanacak. Panel isim tabelasını gösteriyorsa fişi çekip takarak dene.';
+      await disconnect(); showErr(info);
+    } catch (e) { noteSink = null; hold = false; showErr('Kayıt başarısız: ' + (e && e.message ? e.message : e)); }
+    finally { $('btnSaveGif').disabled = $('btnSavePng').disabled = false; }
+  }
+  $('btnSaveGif').addEventListener('click', () => saveToPanel('gif'));
+  $('btnSavePng').addEventListener('click', () => saveToPanel('png'));
+
+  /* ---------- Test sekmesi ---------- */
+  let busy = false;
+  const cap = t => { $('testCap').textContent = t || ' '; if (t) logLine('·', t); };
+  const tx = async (label, bytes) => { logLine('→', label + '  ' + hex(bytes.subarray(0, 24)) + (bytes.length > 24 ? ' …(' + bytes.length + ' bayt)' : '')); await send(bytes); };
+  function waitFor(pred, ms) {
+    return new Promise(res => {
+      const h = b => { if (pred(b)) { done(); res(b); } };
+      const done = () => { const i = rxHooks.indexOf(h); if (i >= 0) rxHooks.splice(i, 1); };
+      rxHooks.push(h); setTimeout(() => { done(); res(null); }, ms);
+    });
+  }
+  async function enterTest() { hold = true; await sleep(800); await tx('canlı mod kapat', Core.diy(0)); await sleep(250); }
+  async function leaveTest() { await tx('canlı mod aç', Core.diy(1)); hold = false; lastRGB = null; }
+  async function storeSlot(type, data, slot, label) {
+    let last = null, ok = true;
+    for (const pk of Core.storePackets(type, data, slot)) {
+      const w = waitFor(b => b.length >= 5 && (b[2] | (b[3] << 8)) === type, 4000);
+      await tx(label + ' parça', pk);
+      last = await w; if (!last) { ok = false; break; }
+    }
+    const st = last ? last[4] : null;
+    logLine('=', label + ': ' + (last ? 'yanıt durumu ' + st : 'YANIT YOK') + (st === 3 ? ' (tamam)' : ''));
+    return ok && st === 3;
+  }
+  const SLOT_COL = [[255,60,60],[255,160,40],[255,230,60],[70,220,100],[60,200,255],[110,110,255],[255,90,200],[255,255,255],[170,255,60]];
+  const TESTS = {
+    async info() {
+      cap('Panel bilgisi');
+      logLine('=', 'aygıt: ' + (dev && dev.name) + ' · ' + W + '×' + H + ' · panel kodu 0x' + panelCode.toString(16) + ' · çerçeve ' + Core.frameSizeFor(panelCode));
+      logLine('=', 'el sıkışma yanıtı: ' + (lastHs || 'yok'));
+    },
+    async bri() {
+      await enterTest();
+      for (const l of [10, 40, 80, 100, 50]) { cap('Parlaklık ' + l + ' (panel değişmeli)'); await tx('parlaklık ' + l, Core.brightness(l)); await sleep(1300); }
+      cap('');
+    },
+    async clock() {
+      await enterTest();
+      for (let st = 0; st <= 7; st++) { cap('Dahili saat stili ' + st + ' (3 sn)'); await tx('saat stili ' + st, Core.clockMode(st, true, true, new Date())); await sleep(3500); }
+      cap('Dahili saat testi bitti. Hangi stiller gösterdi, yaz.');
+    },
+    async slots() {
+      await enterTest(); let okc = 0;
+      for (let n = 1; n <= 9; n++) {
+        cap('Hafıza yeri ' + n + ' yükleniyor…');
+        const fr = Core.bannerFrames(W, H, String(n), { name: SLOT_COL[n - 1], rain: [0, 0, 0] }, 2);
+        if (await storeSlot(0x0003, Core.gifEncode(fr, W, H, 50), n, 'yer ' + n)) okc++;
+        await sleep(300);
+      }
+      logLine('=', 'hafıza yerleri: ' + okc + '/9 kabul edildi');
+      cap(okc + '/9 yer kabul edildi. Fişi çekip takınca hangi rakam görünüyor?');
+    },
+    async plist() {
+      await enterTest();
+      const runs = [['doğru uzunluk', [2, 5, 8], 'fixed', 20], ['belgedeki uzunluk', [3, 6], 'doc', 16], ['hepsi (eski haline)', [1, 2, 3, 4, 5, 6, 7, 8, 9], 'fixed', 3]];
+      for (const [name, list, v, sec] of runs) {
+        cap('Sıra listesi (' + name + '): sadece ' + list.join(', ') + ' dönmeli.');
+        await tx('sıra listesi ' + name, Core.programList(list, v)); await sleep(sec * 1000);
+      }
+      cap('Bitti. Hangi denemede yalnızca listedeki rakamlar döndü, yaz. Liste şimdi 1-9 olarak eski haline döndü.');
+    },
+    async cap() {
+      await enterTest();
+      await tx('yalnızca 9. yer oynasın', Core.programList([9], 'fixed')); await sleep(600);
+      const steps = [[8, '8'], [16, '16'], [32, '32'], [64, '64'], [128, '128'], [256, '256']];
+      for (const [n, label] of steps) {
+        const gif = Core.gifEncode(Core.bannerFrames(W, H, label, { name: [255, 255, 255], rain: [30, 110, 255] }, n), W, H, 8);
+        cap('Kapasite: ' + n + ' kare (' + gif.length + ' bayt) yükleniyor. Panelde "' + label + '" yazmalı (7 sn).');
+        const ok = await storeSlot(0x0003, gif, 9, n + ' kare');
+        if (!ok) { logLine('=', n + ' kare reddedildi'); break; }
+        await sleep(7000);
+      }
+      await tx('liste eski haline', Core.programList([1, 2, 3, 4, 5, 6, 7, 8, 9], 'fixed'));
+      cap('Kapasite testi bitti. Panelde EN SON hangi sayıyı gördün, yaz. 9. yer şimdi büyük GIF olabilir.');
+    },
+    async def() {
+      await enterTest();
+      cap('Varsayılan mod gönderiliyor. Panel ne gösteriyor?');
+      await tx('varsayılan mod', Core.defaultMode()); await sleep(6000);
+      cap('Panelin gösterdiğini yaz.');
+    },
+    async erase() {
+      await enterTest(); cap('Hafıza siliniyor…');
+      const w = waitFor(b => b.length >= 5 && (b[2] | (b[3] << 8)) === 0x0102, 3000);
+      await tx('tümünü sil (doğru uzunluk)', Core.eraseBuffers([], 'fixed'));
+      let r = await w;
+      if (!r) { const w2 = waitFor(b => b.length >= 5 && (b[2] | (b[3] << 8)) === 0x0102, 3000); await tx('tümünü sil (belgedeki uzunluk)', Core.eraseBuffers([], 'doc')); r = await w2; }
+      logLine('=', 'silme yanıtı: ' + (r ? hex(r) : 'yok'));
+      cap('Silme gönderildi. Fişi çekip tak: panel ne gösteriyor?');
+    }
+  };
+  async function runTest(name) {
+    if (busy) return;
+    if (!connected) { cap('Önce panele bağlan.'); return; }
+    busy = true; document.querySelectorAll('#ctl-test .chip').forEach(b => { if (b.id !== 'logCopy' && b.id !== 'logClear') b.disabled = true; });
+    logLine('#', '=== ' + name + ' ===');
+    try { await TESTS[name](); } catch (e) { logLine('!', 'HATA: ' + (e && e.message ? e.message : e)); cap('Test hatası: ' + (e && e.message)); }
+    busy = false; document.querySelectorAll('#ctl-test .chip').forEach(b => { b.disabled = false; });
+  }
+  document.querySelectorAll('#tBtns [data-test]').forEach(b => b.addEventListener('click', () => runTest(b.dataset.test)));
+  let eraseArm = 0;
+  document.querySelector('[data-test="erase"]').addEventListener('click', e => {
+    e.stopImmediatePropagation();
+    if (Date.now() - eraseArm < 4000) { eraseArm = 0; e.currentTarget.textContent = 'Tüm hafızayı sil (başlangıç ekranı)'; runTest('erase'); }
+    else { eraseArm = Date.now(); const b = e.currentTarget; b.textContent = 'Emin misin? Tekrar dokun'; setTimeout(() => { if (eraseArm) { b.textContent = 'Tüm hafızayı sil (başlangıç ekranı)'; eraseArm = 0; } }, 4000); }
+  }, true);
+  $('tAll').addEventListener('click', async () => {
+    if (!connected) { cap('Önce panele bağlan.'); return; }
+    for (const n of ['info', 'bri', 'clock', 'slots', 'plist', 'cap', 'def']) { await runTest(n); await sleep(300); }
+    cap('Hepsi bitti. Günlüğü kopyalayıp bana yapıştır.');
+  });
+  $('tLive').addEventListener('click', async () => { if (!connected) { cap('Önce panele bağlan.'); return; } try { await leaveTest(); cap('Canlı moda dönüldü.'); } catch (e) { cap('Hata: ' + e.message); } });
+  $('rawSend').addEventListener('click', async () => {
+    if (!connected) { cap('Önce panele bağlan.'); return; }
+    const m = $('rawHex').value.replace(/0x/gi, '').match(/[0-9a-f]{2}/gi);
+    if (!m) { cap('Geçerli hex yaz (örnek: 05 00 04 80 32)'); return; }
+    try { await tx('elle', Uint8Array.from(m.map(x => parseInt(x, 16)))); } catch (e) { logLine('!', e.message); }
+  });
+
+  /* ---------- Kütüphane sekmesi ---------- */
+  let libSel = 1, libSrc = 'sign', libFit = 'contain', libColorV = [255, 160, 40], libState = {}, libSign = 0, recClip = null;
+  const b64 = bytes => { let s2 = ''; for (let i = 0; i < bytes.length; i += 8192) s2 += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)); return btoa(s2); };
+  const unb64 = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+  try {
+    const j = JSON.parse(localStorage.getItem('ledLib2') || localStorage.getItem('ledLib') || '{}');
+    for (const k in j) { const v = j[k]; libState[k] = typeof v === 'string' ? { label: v, gif: null } : (v && v.label ? { label: v.label, gif: v.gif || null } : null); if (!libState[k]) delete libState[k]; }
+  } catch (e) {}
+  const saveLibState = () => { try { localStorage.setItem('ledLib2', JSON.stringify(libState)); } catch (e) { logLine('!', 'Küçük resimler bu telefonda saklanamadı (yer doldu).'); } };
+  const libCap = t => { $('libCap').textContent = t || ' '; if (t) logLine('·', t); };
+  const SIGNS = [
+    ['Merhaba', 'MERHABA'], ['Hoş geldin', 'HOS GELDIN'], ['Günaydın', 'GUNAYDIN'], ['İyi geceler', 'IYI GECELER'],
+    ['Afiyet olsun', 'AFIYET OLSUN'], ['Güle güle', 'GULE GULE'], ['Bugünün tarihi', () => { const d = new Date(); return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getFullYear() % 100).padStart(2, '0'); }]
+  ];
+  function drawLibSlots() {
+    const root = $('libSlots'); root.innerHTML = '';
+    for (let n = 1; n <= 9; n++) {
+      const e = libState[n], b = document.createElement('button'); b.type = 'button'; b.className = 'slot'; b.setAttribute('aria-pressed', String(n === libSel));
+      let top;
+      if (e && e.gif) { top = document.createElement('img'); top.alt = e.label; top.src = 'data:image/gif;base64,' + e.gif; }
+      else { top = document.createElement('div'); top.className = 'ph'; top.textContent = e ? 'önizleme yok' : 'boş'; }
+      const nb = document.createElement('span'); nb.className = 'nb'; nb.textContent = n;
+      const lb = document.createElement('span'); lb.className = 'lb'; lb.textContent = e ? e.label : ' ';
+      b.append(top, nb, lb); b.addEventListener('click', () => { libSel = n; drawLibSlots(); }); root.appendChild(b);
+    }
+  }
+  function drawSigns() {
+    const root = $('libSigns'); root.innerHTML = '';
+    SIGNS.forEach((sg, i) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = sg[0]; b.setAttribute('aria-pressed', String(i === libSign));
+      b.addEventListener('click', () => { libSign = i; drawSigns(); }); root.appendChild(b);
+    });
+  }
+  function syncLibUI() {
+    document.querySelectorAll('#libSrc [data-src]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.src === libSrc)));
+    document.querySelectorAll('#libFit [data-fit]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fit === libFit)));
+    $('libSignRow').hidden = libSrc !== 'sign'; $('libTextRow').hidden = libSrc !== 'scroll'; $('libFileRow').hidden = libSrc !== 'file';
+    $('libHint').textContent = ({
+      sign: 'Hazır mesajlar yağmurlu tabela olarak yapılır, uzun olanlar kayar. Tarih, kaydettiğin günün tarihidir ve kendiliğinden güncellenmez.',
+      name: 'Saat sekmesindeki isim ve renklerle yağmurlu tabela yapılır.',
+      scroll: 'Yazı sağdan sola kayar. Tek renk, siyah zemin.',
+      draw: 'Çizim sekmesinde en son bıraktığın çizim kaydedilir.',
+      rec: recClip ? 'Hazır: ' + recClip.label + ' (' + recClip.frames.length + ' kare).' : 'Önizlemenin altındaki "4 sn kaydet" düğmesine bas. Herhangi bir oyunu, efekti ya da saati kaydedebilirsin.',
+      file: 'Telefondan resim ya da GIF seç. Renkler 256 renge indirilir, fotoğraflara titreşim eklenir.',
+      inbox: inboxCurrent() ? 'Gelen kutusunda seçili çizim: ' + inboxCurrent().d.title + '.' : 'Gelen kutusunda henüz seçili çizim yok.'
+    })[libSrc];
+  }
+  document.querySelectorAll('#libSrc [data-src]').forEach(b => b.addEventListener('click', () => { libSrc = b.dataset.src; syncLibUI(); }));
+  document.querySelectorAll('#libFit [data-fit]').forEach(b => b.addEventListener('click', () => { libFit = b.dataset.fit; syncLibUI(); }));
+  swatches($('libColor'), c => { libColorV = c.join() === '0,0,0' ? [255, 255, 255] : c; }, libColorV);
+
+  async function fileFrames(file) {
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const c = cv.getContext('2d', { willReadFrequently: true });
+    const grab = (img, iw, ih) => {
+      c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+      const k = libFit === 'cover' ? Math.max(W / iw, H / ih) : Math.min(W / iw, H / ih), dw = iw * k, dh = ih * k;
+      c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+      c.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      const d = c.getImageData(0, 0, W, H).data, out = new Uint8Array(W * H * 3);
+      for (let i = 0; i < W * H; i++) { out[i * 3] = d[i * 4]; out[i * 3 + 1] = d[i * 4 + 1]; out[i * 3 + 2] = d[i * 4 + 2]; }
+      return out;
+    };
+    if (file.type === 'image/gif' && window.ImageDecoder) {
+      try {
+        const dec = new ImageDecoder({ data: await file.arrayBuffer(), type: 'image/gif' });
+        await dec.tracks.ready;
+        const n = Math.min(dec.tracks.selectedTrack.frameCount, 150), frames = []; let total = 0;
+        for (let i = 0; i < n; i++) {
+          const r = await dec.decode({ frameIndex: i });
+          frames.push(grab(r.image, r.image.displayWidth, r.image.displayHeight)); total += (r.image.duration || 100000) / 10000; r.image.close();
+        }
+        return { frames, delay: Math.max(2, Math.round(total / Math.max(1, n))) };
+      } catch (e) { logLine('!', 'GIF çözülemedi, ilk kare alınacak: ' + e.message); }
+    }
+    const bmp = await createImageBitmap(file);
+    return { frames: [grab(bmp, bmp.width, bmp.height)], delay: 100 };
+  }
+  async function buildLib() {
+    if (libSrc === 'sign') {
+      const sg = SIGNS[libSign], t = typeof sg[1] === 'function' ? sg[1]() : sg[1], lab = 'tabela: ' + (typeof sg[1] === 'function' ? t : sg[0]);
+      if (Core.textWidth(Core.normalize(t)) <= W) return { frames: Core.bannerFrames(W, H, t, { name: clockCfg.colors.name, rain: clockCfg.colors.rain }, 32), delay: 8, label: lab };
+      return { frames: Core.scrollFrames(W, H, t, clockCfg.colors.name), delay: 6, label: lab };
+    }
+    if (libSrc === 'name') {
+      if (!clockCfg.text.trim()) throw new Error('Saat sekmesinde isim yazısı boş.');
+      return { frames: Core.bannerFrames(W, H, clockCfg.text, { name: clockCfg.colors.name, rain: clockCfg.colors.rain }, 32), delay: 8, label: 'isim: ' + clockCfg.text };
+    }
+    if (libSrc === 'scroll') {
+      const t = $('libText').value; if (!t.trim()) throw new Error('Yazı boş.');
+      return { frames: Core.scrollFrames(W, H, t, libColorV), delay: 6, label: 'yazı: ' + t.slice(0, 14) };
+    }
+    if (libSrc === 'draw') {
+      if (!drawSnap) throw new Error('Önce Çizim sekmesinde bir şey çiz.');
+      return { frames: [Core.toDeviceRGB(drawSnap.buf, drawSnap.lw, drawSnap.lh, rot, W, H)], delay: 100, label: 'çizim' };
+    }
+    if (libSrc === 'rec') {
+      if (!recClip) throw new Error('Önce "4 sn kaydet" ile bir kayıt al.');
+      return { frames: recClip.frames, delay: recClip.delay, label: recClip.label };
+    }
+    if (libSrc === 'inbox') {
+      const it = inboxCurrent(); if (!it) throw new Error('Gelen kutusunda seçili çizim yok.');
+      const d = it.d;
+      return { frames: d.frames.map(f => Core.toDeviceRGB(Core.placeDrawing(f, d.w, d.h, lw, lh, inboxFit), lw, lh, rot, W, H)),
+        delay: d.delays.map(ms => Math.max(2, Math.round(ms / 10))), label: 'gelen: ' + d.title };
+    }
+    const f = $('libFile').files[0]; if (!f) throw new Error('Önce bir dosya seç.');
+    const r = await fileFrames(f);
+    r.frames = Core.dither332(r.frames, W, H, r.frames.length === 1);
+    r.label = 'dosya: ' + f.name.slice(0, 14) + (r.frames.length > 1 ? ' (' + r.frames.length + ' kare)' : ''); return r;
+  }
+  async function libRun(fn) {
+    if (!connected) { libCap('Önce panele bağlan.'); return; }
+    if (busy) return; busy = true;
+    document.querySelectorAll('#ctl-lib button').forEach(b => b.disabled = true);
+    try { await fn(); } catch (e) { libCap('Hata: ' + (e && e.message ? e.message : e)); }
+    busy = false; document.querySelectorAll('#ctl-lib button').forEach(b => b.disabled = false);
+  }
+  $('libSave').addEventListener('click', () => libRun(async () => {
+    const n = libSel; libCap('Hazırlanıyor…');
+    const r = await buildLib();
+    const gif = Core.gifEncode(r.frames, W, H, r.delay);
+    libCap('Yer ' + n + ': ' + r.frames.length + ' kare, ' + gif.length + ' bayt yükleniyor…');
+    await enterTest();
+    const ok = await storeSlot(0x0003, gif, n, 'yer ' + n);
+    if (ok) { libState[n] = { label: r.label, gif: b64(gif) }; saveLibState(); drawLibSlots(); libCap('Yer ' + n + ' kaydedildi (' + r.label + '). Panelde görünmeli.'); }
+    else libCap('Yer ' + n + ' kaydı panelden onay almadı. Günlüğe bak (Araçlar, Test).');
+  }));
+  async function eraseSlot(n) {
+    const w = waitFor(b => b.length >= 5 && (b[2] | (b[3] << 8)) === 0x0102, 3000);
+    await tx('sil ' + n, Core.eraseBuffers([n], 'fixed')); const r = await w;
+    return !!r;
+  }
+  $('libDel').addEventListener('click', () => libRun(async () => {
+    await enterTest(); const ok = await eraseSlot(libSel);
+    if (ok) { delete libState[libSel]; saveLibState(); }
+    drawLibSlots(); libCap(ok ? 'Yer ' + libSel + ' silindi.' : 'Silme yanıtı gelmedi.');
+  }));
+  $('libDelAll').addEventListener('click', () => libRun(async () => {
+    await enterTest(); let c = 0;
+    for (let n = 1; n <= 9; n++) { libCap('Yer ' + n + ' siliniyor…'); if (await eraseSlot(n)) { c++; delete libState[n]; } await sleep(150); }
+    saveLibState(); drawLibSlots(); libCap(c + '/9 yer silindi.');
+  }));
+  async function swapSlots(a, b) {
+    const ea = libState[a], eb = libState[b];
+    if (!ea && !eb) { libCap('İki yer de boş.'); return; }
+    if ((ea && !ea.gif) || (eb && !eb.gif)) { libCap('Bu yerin içeriği bu telefonda kayıtlı değil, taşınamaz. Önce yeniden yükle.'); return; }
+    await enterTest();
+    const put = async (slot, e) => e ? storeSlot(0x0003, unb64(e.gif), slot, 'yer ' + slot) : eraseSlot(slot);
+    libCap('Yer ' + a + ' ↔ ' + b + ' değiştiriliyor…');
+    const ok1 = await put(a, eb), ok2 = ok1 && await put(b, ea);
+    if (ok1 && ok2) {
+      if (eb) libState[a] = eb; else delete libState[a];
+      if (ea) libState[b] = ea; else delete libState[b];
+      libSel = b; saveLibState(); drawLibSlots(); libCap('Yer ' + a + ' ile ' + b + ' değişti.');
+    } else libCap('Değişiklik tamamlanamadı. Panelin durumu karışmış olabilir, günlüğe bak.');
+  }
+  $('libUp').addEventListener('click', () => { if (libSel > 1) libRun(() => swapSlots(libSel, libSel - 1)); });
+  $('libDown').addEventListener('click', () => { if (libSel < 9) libRun(() => swapSlots(libSel, libSel + 1)); });
+  $('libLive').addEventListener('click', async () => { if (!connected) { libCap('Önce panele bağlan.'); return; } try { await leaveTest(); libCap('Canlı moda dönüldü.'); } catch (e) { libCap('Hata: ' + e.message); } });
+
+  /* ekran kaydı: önizlemeyi 4 saniye GIF olarak kaydeder */
+  let recTimer = null;
+  $('recBtn').addEventListener('click', () => {
+    if (recTimer) return;
+    const frames = [], btn = $('recBtn'), t0 = performance.now(), from = tab;
+    btn.classList.add('on');
+    recTimer = setInterval(() => {
+      frames.push(Core.toDeviceRGB(g.buf, lw, lh, rot, W, H));
+      const left = Math.max(0, 4 - (performance.now() - t0) / 1000); btn.textContent = 'Kaydediliyor ' + left.toFixed(1) + ' sn';
+      if (frames.length >= 40) {
+        clearInterval(recTimer); recTimer = null; btn.classList.remove('on'); btn.textContent = '4 sn kaydet';
+        const tn = { inbox: 'gelen', fx: 'efekt', clock: 'saat', text: 'yazı', draw: 'çizim', snake: 'yılan', brick: 'tuğla', pong: 'pong', flappy: 'flappy', tetris: 'tetris', dino: 'dino', space: 'uzay', car: 'araba', simon: 'simon', lib: 'önizleme', test: 'önizleme' }[from] || from;
+        recClip = { frames, delay: 10, label: 'kayıt: ' + tn };
+        libSrc = 'rec'; libCap('Kayıt hazır (' + frames.length + ' kare). Bir yer seçip "Seçili yere kaydet"e bas.'); syncLibUI(); selectTab('lib');
+      }
+    }, 100);
+  });
+  drawLibSlots(); drawSigns(); syncLibUI();
+
+  const slotList = t => (t.match(/\d+/g) || []).map(Number).filter(n => n >= 1 && n <= 9);
+  async function oneShot(label, bytes) {
+    if (!connected) { cap('Önce panele bağlan.'); return; }
+    if (busy) return; busy = true;
+    try { await enterTest(); cap(label + ' gönderiliyor. Panele bak.'); await tx(label, bytes); await sleep(1500); cap(label + ' gönderildi. Panelde ne oldu, yaz.'); }
+    catch (e) { logLine('!', e.message); }
+    busy = false;
+  }
+  $('lstFixed').addEventListener('click', () => { const l = slotList($('lstIn').value); if (l.length) oneShot('liste ' + l.join(',') + ' (doğru uzunluk)', Core.programList(l, 'fixed')); });
+  $('lstDoc').addEventListener('click', () => { const l = slotList($('lstIn').value); if (l.length) oneShot('liste ' + l.join(',') + ' (belgedeki uzunluk)', Core.programList(l, 'doc')); });
+  $('delFixed').addEventListener('click', () => { const l = slotList($('delIn').value).slice(0, 1); if (l.length) oneShot('sil ' + l[0] + ' (doğru uzunluk)', Core.eraseBuffers(l, 'fixed')); });
+  $('delDoc').addEventListener('click', () => { const l = slotList($('delIn').value).slice(0, 1); if (l.length) oneShot('sil ' + l[0] + ' (belgedeki uzunluk)', Core.eraseBuffers(l, 'doc')); });
+  $('logClear').addEventListener('click', () => { logLines.length = 0; $('logBox').value = ''; });
+  $('logCopy').addEventListener('click', async () => {
+    const head = 'LED panel test günlüğü · ' + (dev ? dev.name : 'bağlı değil') + ' · ' + W + '×' + H + ' · kod 0x' + panelCode.toString(16) + '\n';
+    const text = head + logLines.join('\n');
+    try { await navigator.clipboard.writeText(text); cap('Günlük kopyalandı.'); }
+    catch (e) { const el = $('logBox'); el.removeAttribute('readonly'); el.focus(); el.select(); cap('Otomatik kopyalanamadı. Metin seçildi, elle kopyala.'); }
+  });
+
+  swatches($('drawColors'), c => { drawColor = c; if (tab === 'draw') app.setColor(c); }, drawColor);
+  $('txt').addEventListener('input', e => { if (tab === 'text') app.set({ text: e.target.value }); });
+  $('txtSpeed').addEventListener('input', e => { if (tab === 'text') app.setSpeed(Number(e.target.value)); });
+  $('btnClear').addEventListener('click', () => { if (tab === 'draw') app.clear(); });
+
+  /* ---------- Gelen kutusu: GitHub deposunu yoklar ---------- */
+  const saveInboxCfg = () => { try { localStorage.setItem('ledInboxCfg', JSON.stringify({ fit: inboxFit, auto: inboxAuto, repo: inboxRepo() })); } catch (e) {} };
+  const saveSeen = () => { try { localStorage.setItem('ledInboxSeen', JSON.stringify([...inboxSeen].slice(-500))); } catch (e) {} };
+  const inboxRepo = () => { const v = $('inboxRepo').value.trim(); return REPO_RE.test(v) ? v : 'apokyun/led-panel-gelen-kutusu'; };
+  const clockStr = d => d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  function inboxStatus(t, bad) { const e = $('inboxStatus'); e.textContent = t; e.className = bad ? 'bad' : ''; }
+  function thumbOf(d) {
+    const cv = document.createElement('canvas'); cv.width = d.w; cv.height = d.h;
+    const c = cv.getContext('2d'), im = c.createImageData(d.w, d.h), f = d.frames[0];
+    for (let i = 0; i < d.w * d.h; i++) { im.data[i * 4] = f[i * 3]; im.data[i * 4 + 1] = f[i * 3 + 1]; im.data[i * 4 + 2] = f[i * 3 + 2]; im.data[i * 4 + 3] = 255; }
+    c.putImageData(im, 0, 0); return cv.toDataURL('image/png');
+  }
+  function inboxMarkSeen() {
+    if (inboxSel && !inboxSeen.has(inboxSel)) { inboxSeen.add(inboxSel); saveSeen(); inboxRender(); }
+  }
+  function inboxRender() {
+    const root = $('inboxList'); root.innerHTML = '';
+    for (const it of inboxItems) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'slot'; b.setAttribute('aria-pressed', String(it.id === inboxSel));
+      let top;
+      if (it.d) { top = document.createElement('img'); top.alt = it.title; top.src = it.d.thumb; }
+      else { top = document.createElement('div'); top.className = 'ph'; top.textContent = 'okunamadı'; }
+      const lb = document.createElement('span'); lb.className = 'lb'; lb.textContent = it.title;
+      b.append(top, lb);
+      if (it.d && !inboxSeen.has(it.id)) { const n = document.createElement('span'); n.className = 'new'; n.textContent = 'YENİ'; b.append(n); }
+      b.addEventListener('click', () => inboxSelect(it.id));
+      root.appendChild(b);
+    }
+    if (!inboxItems.length) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'Henüz çizim yok.'; root.appendChild(p); }
+    const unseen = inboxItems.filter(it => it.d && !inboxSeen.has(it.id)).length, badge = $('inboxBadge');
+    badge.textContent = unseen; badge.hidden = !unseen;
+    const cur = inboxCurrent();
+    $('inboxCap').textContent = cur ? cur.title + ' · ' + cur.d.w + '×' + cur.d.h + (cur.d.frames.length > 1 ? ' · ' + cur.d.frames.length + ' kare' : '') +
+      (cur.created ? ' · ' + new Date(cur.created).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '') : ' ';
+    document.querySelectorAll('#inboxFit [data-fit]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.fit === inboxFit)));
+    $('inboxAuto').setAttribute('aria-pressed', String(inboxAuto));
+    if (libSrc === 'inbox') syncLibUI();
+  }
+  function inboxSelect(id) {
+    const it = inboxItems.find(x => x.id === id && x.d); if (!it) return;
+    inboxSel = id;
+    if (tab === 'inbox') { app.show(it.d); lastRGB = null; inboxSeen.add(id); saveSeen(); }
+    inboxRender();
+  }
+  async function inboxLoad(repo, sha) {
+    const base = 'https://raw.githubusercontent.com/' + repo + '/' + sha + '/';
+    const r = await fetch(base + 'inbox/index.json', { cache: 'no-store' });
+    let list = [];
+    if (r.ok) { const idx = await r.json(); list = (idx && Array.isArray(idx.items) ? idx.items : []).filter(it => it && it.id && it.file).slice(0, 60); }
+    else if (r.status !== 404) throw new Error('liste HTTP ' + r.status);
+    const next = await Promise.all(list.map(async it => {
+      const key = it.file + '@' + (it.rev || sha);
+      let d = inboxCache.get(key);
+      if (!d) {
+        try {
+          const rr = await fetch(base + it.file, { cache: 'no-store' });
+          if (!rr.ok) throw new Error('HTTP ' + rr.status);
+          d = Core.decodeDrawing(await rr.json()); d.thumb = thumbOf(d); inboxCache.set(key, d);
+        } catch (e) { d = null; logLine('!', 'gelen kutusu: ' + it.file + ' okunamadı: ' + e.message); }
+      }
+      return { id: String(it.id), title: String(it.title || (d && d.title) || it.id), created: String(it.created || ''), d };
+    }));
+    const oldCur = inboxCurrent();
+    inboxItems = next;
+    const fresh = next.filter(it => it.d && !inboxSeen.has(it.id));
+    if (fresh.length && inboxAuto) {
+      inboxSel = fresh[0].id;
+      if (TABCAT[tab] === 'gorsel' && tab !== 'inbox' && tab !== 'draw') selectTab('inbox');
+    } else if (!inboxCurrent()) inboxSel = (next.find(it => it.d) || {}).id || null;
+    const cur = inboxCurrent();
+    if (tab === 'inbox' && cur && (!oldCur || cur.d !== oldCur.d)) { app.show(cur.d); lastRGB = null; }
+    if (tab === 'inbox' && cur) { inboxSeen.add(cur.id); saveSeen(); }
+    if (tab === 'inbox' && !cur) app.show(null);
+    inboxRender();
+  }
+  async function inboxCheck(force) {
+    if (inboxBusy) return;
+    if (!force && Date.now() < inboxBlockedUntil) return;
+    inboxBusy = true;
+    const repo = inboxRepo();
+    try {
+      const headers = { Accept: 'application/vnd.github+json' };
+      if (inboxEtag && inboxSha) headers['If-None-Match'] = inboxEtag;
+      const r = await fetch('https://api.github.com/repos/' + repo + '/git/ref/heads/main', { headers, cache: 'no-store' });
+      const n = inboxItems.length + ' çizim';
+      if (r.status === 304) { inboxStatus('Son bakış ' + clockStr(new Date()) + ' · yeni yok · ' + n); return; }
+      if (r.status === 403 || r.status === 429) {
+        const reset = Number(r.headers.get('x-ratelimit-reset')) * 1000;
+        inboxBlockedUntil = reset > Date.now() ? reset + 1000 : Date.now() + 60000;
+        inboxStatus('GitHub sorgu sınırı doldu. ' + clockStr(new Date(inboxBlockedUntil)) + ' sonra yeniden bakılacak.', true); return;
+      }
+      if (r.status === 404) { inboxStatus('Depo ya da main dalı bulunamadı: ' + repo, true); return; }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const etag = r.headers.get('ETag'), j = await r.json(), sha = j && j.object && j.object.sha;
+      if (!sha) throw new Error('SHA okunamadı');
+      if (sha !== inboxSha) await inboxLoad(repo, sha);
+      inboxSha = sha; inboxEtag = etag;   // yalnızca başarılı okumadan sonra: hata olursa sonraki yoklamada yeniden denenir
+      inboxStatus('Son bakış ' + clockStr(new Date()) + ' · ' + inboxItems.length + ' çizim · ' + sha.slice(0, 7));
+    } catch (e) {
+      inboxStatus('Bakılamadı (' + (e && e.message ? e.message : e) + '). İnternet bağlantısını kontrol et.', true);
+    } finally { inboxBusy = false; }
+  }
+  function inboxSchedule() {
+    clearTimeout(inboxTimer);
+    inboxTimer = setTimeout(async () => { await inboxCheck(false); inboxSchedule(); }, document.hidden ? 60000 : 10000);
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) inboxCheck(false).then(inboxSchedule); });
+  const inboxStep = k => {
+    const ok = inboxItems.filter(it => it.d); if (!ok.length) return;
+    const i = ok.findIndex(it => it.id === inboxSel);
+    inboxSelect(ok[(i + k + ok.length) % ok.length].id);
+  };
+  $('inboxPrev').addEventListener('click', () => inboxStep(-1));
+  $('inboxNext').addEventListener('click', () => inboxStep(1));
+  $('inboxNow').addEventListener('click', () => { inboxStatus('Bakılıyor…'); inboxCheck(true); });
+  document.querySelectorAll('#inboxFit [data-fit]').forEach(b => b.addEventListener('click', () => {
+    inboxFit = b.dataset.fit; saveInboxCfg(); if (tab === 'inbox') { app.setFit(inboxFit); lastRGB = null; } inboxRender();
+  }));
+  $('inboxAuto').addEventListener('click', () => { inboxAuto = !inboxAuto; saveInboxCfg(); inboxRender(); });
+  $('inboxEdit').addEventListener('click', () => {
+    const it = inboxCurrent(); if (!it) { $('inboxCap').textContent = 'Önce bir çizim seç.'; return; }
+    drawSeed = Core.placeDrawing(it.d.frames[0], it.d.w, it.d.h, lw, lh, inboxFit); selectTab('draw');
+  });
+  $('inboxStore').addEventListener('click', () => {
+    if (!inboxCurrent()) { $('inboxCap').textContent = 'Önce bir çizim seç.'; return; }
+    libSrc = 'inbox'; syncLibUI(); selectTab('lib'); libCap('Gelen çizim hazır. Bir yer seçip "Seçili yere kaydet"e bas.');
+  });
+  $('inboxRepo').addEventListener('change', () => {
+    if (!REPO_RE.test($('inboxRepo').value.trim())) { inboxStatus('Depo "kullanıcı/depo" biçiminde olmalı.', true); return; }
+    saveInboxCfg(); inboxSha = null; inboxEtag = null; inboxItems = []; inboxSel = null; inboxBlockedUntil = 0;
+    if (tab === 'inbox') app.show(null);
+    inboxRender(); inboxStatus('Bakılıyor…'); inboxCheck(true).then(inboxSchedule);
+  });
+  inboxRender();
+
+  // D-pad (basılı tutunca tekrar eder)
+  let rep = null;
+  document.querySelectorAll('#pad button').forEach(b => {
+    const stop = () => { clearInterval(rep); rep = null; };
+    b.addEventListener('pointerdown', e => {
+      e.preventDefault(); const d = b.dataset.d; app.dir(d); stop();
+      const nr = (MODES[tab] && MODES[tab].noRepeat) || [];
+      if (!nr.includes(d)) rep = setInterval(() => app.dir(d), 90);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => b.addEventListener(t, stop));
+  });
+  const KEYS = { ArrowLeft: 'L', ArrowRight: 'R', ArrowUp: 'U', ArrowDown: 'D', a: 'L', d: 'R', w: 'U', s: 'D', ' ': 'A' };
+  window.addEventListener('keydown', e => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
+    const d = KEYS[e.key];
+    if (d && MODES[tab] && MODES[tab].pad && !e.repeat) { e.preventDefault(); app.dir(d); }
+  });
+
+  // Önizleme üzerinde dokunma: tuğla ve çizim koordinat alır, yılan kaydırma alır
+  let down = false, sx = 0, sy = 0, moved = false;
+  const touchMode = () => (MODES[tab] && MODES[tab].touch) || 'none';
+  function logical(e) { const r = view.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * lw, (e.clientY - r.top) / r.height * lh]; }
+  view.addEventListener('pointerdown', e => {
+    const m = touchMode(); if (m === 'none') return;
+    down = true; moved = false; view.setPointerCapture(e.pointerId); sx = e.clientX; sy = e.clientY;
+    const [x, y] = logical(e);
+    if (m === 'drag') app.pointer(x, y, 'down');
+    else if (m === 'tap') app.dir('A');
+  });
+  view.addEventListener('pointermove', e => {
+    if (!down) return; const m = touchMode();
+    if (m === 'swipe') {
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > 14) { moved = true; app.dir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'R' : 'L') : (dy > 0 ? 'D' : 'U')); sx = e.clientX; sy = e.clientY; }
+    } else if (m === 'drag') { const [x, y] = logical(e); app.pointer(x, y, 'move'); }
+  });
+  const end = e => {
+    if (!down) return; down = false; const m = touchMode(); const [x, y] = logical(e);
+    if (m === 'drag') app.pointer(x, y, 'up');
+    else if (m === 'swipe' && !moved) app.dir(tab === 'tetris' ? 'T' : '');
+  };
+  view.addEventListener('pointerup', end); view.addEventListener('pointercancel', end);
+
+  setInterval(() => {
+    $('info').textContent = app.info ? app.info() : '';
+    if (connected) { const f = sent - sentMark; sentMark = sent; $('fps').textContent = f + ' kare/sn'; }
+  }, 1000);
+  setInterval(() => { if (tab !== 'fx') $('info').textContent = app.info(); }, 200);
+
+  setup();
+  selectTab('clock');
+  inboxStatus('Bakılıyor…'); inboxCheck(false).then(inboxSchedule);
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>

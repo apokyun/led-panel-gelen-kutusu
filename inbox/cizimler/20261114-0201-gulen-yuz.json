@@ -1,0 +1,52 @@
+{
+ "title": "Göz kırpan yüz",
+ "created": "2026-11-14T02:01:00+03:00",
+ "w": 16,
+ "h": 16,
+ "palette": {
+  "Y": "#ffd21e"
+ },
+ "frames": [
+  [
+   "................",
+   ".....YYYYYY.....",
+   "...YYYYYYYYYY...",
+   "..YYYYYYYYYYYY..",
+   ".YYYY..YY..YYYY.",
+   ".YYYY..YY..YYYY.",
+   "YYYYYYYYYYYYYYYY",
+   "YYYYYYYYYYYYYYYY",
+   "YYY.YYYYYYYY.YYY",
+   ".YYY.YYYYYY.YYY.",
+   ".YYYY......YYYY.",
+   "..YYYYYYYYYYYY..",
+   "...YYYYYYYYYY...",
+   ".....YYYYYY.....",
+   "................",
+   "................"
+  ],
+  [
+   "................",
+   ".....YYYYYY.....",
+   "...YYYYYYYYYY...",
+   "..YYYYYYYYYYYY..",
+   ".YYYYYYYYYYYYYY.",
+   ".YYY...YY...YYY.",
+   "YYYYYYYYYYYYYYYY",
+   "YYYYYYYYYYYYYYYY",
+   "YYY.YYYYYYYY.YYY",
+   ".YYY.YYYYYY.YYY.",
+   ".YYYY......YYYY.",
+   "..YYYYYYYYYYYY..",
+   "...YYYYYYYYYY...",
+   ".....YYYYYY.....",
+   "................",
+   "................"
+  ]
+ ],
+ "delays": [
+  1800,
+  160
+ ],
+ "note": "Örnek: göz kırpma"
+}
