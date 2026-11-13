@@ -2,6 +2,16 @@
  "version": 1,
  "items": [
   {
+   "id": "20261114-0215-yun-yumakli-kedi",
+   "title": "Yün yumaklı kedi",
+   "file": "inbox/cizimler/20261114-0215-yun-yumakli-kedi.json",
+   "rev": "ca1f075a21",
+   "w": 32,
+   "h": 16,
+   "frames": 12,
+   "created": "2026-11-14T02:15:00+03:00"
+  },
+  {
    "id": "20261114-0214-kuru-kafa",
    "title": "Kuru kafa ve yarasalar",
    "file": "inbox/cizimler/20261114-0214-kuru-kafa.json",
