@@ -2,6 +2,16 @@
  "version": 1,
  "items": [
   {
+   "id": "20261114-0228-claude-selam",
+   "title": "Claude merhaba diyor",
+   "file": "inbox/cizimler/20261114-0228-claude-selam.json",
+   "rev": "2ad9dc27c7",
+   "w": 32,
+   "h": 16,
+   "frames": 22,
+   "created": "2026-11-14T02:28:00+03:00"
+  },
+  {
    "id": "20261114-0218-turk-bayragi",
    "title": "Dalgalanan Türk bayrağı",
    "file": "inbox/cizimler/20261114-0218-turk-bayragi.json",
