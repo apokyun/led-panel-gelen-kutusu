@@ -327,6 +327,9 @@ body{background-image:radial-gradient(1200px 500px at 50% -10%,color-mix(in srgb
     </div>
     <div class="field"><label for="inboxRepo">GitHub deposu</label>
       <input id="inboxRepo" type="text" value="apokyun/led-panel-gelen-kutusu" autocomplete="off" spellcheck="false"></div>
+    <div class="field"><label for="inboxToken">GitHub anahtarı (isteğe bağlı)</label>
+      <input id="inboxToken" type="password" placeholder="github_pat_…" autocomplete="off" spellcheck="false"></div>
+    <p class="hint">Anahtarsız GitHub saatte yalnızca 60 soruya izin verir. Sayfa bu hakkı saate yayar, aralarda yedek yoldan bakar; yeni çizim birkaç dakika gecikebilir. Anahtar girersen 10 saniyede bir bakar. Almak için: GitHub → Settings → Developer settings → Fine-grained tokens → Generate new token, "Public repositories (read-only)" seç, izin ekleme. Anahtar yalnızca bu telefonda saklanır ve sadece api.github.com'a gönderilir.</p>
   </section>
 
   <section class="card" id="ctl-draw" aria-label="Çizim ayarları" hidden>
@@ -1582,7 +1585,8 @@ const Core = (() => {
   let textColor = [255, 160, 40], drawColor = [255, 255, 255];
   // Gelen kutusu durumu (aşağıdaki fonksiyonlardan önce tanımlı olmalı)
   let drawSeed = null, inboxFit = 'zoom', inboxAuto = true, inboxItems = [], inboxSel = null, inboxSeen = new Set();
-  let inboxSha = null, inboxEtag = null, inboxTimer = null, inboxBusy = false, inboxBlockedUntil = 0;
+  let inboxSha = null, inboxEtag = null, inboxTimer = null, inboxBusy = false, inboxBlockedUntil = 0, inboxApiNext = 0, inboxToken = '';
+  try { inboxToken = localStorage.getItem('ledInboxToken') || ''; } catch (e) {}
   const inboxCache = new Map(), REPO_RE = /^[\w.-]+\/[\w.-]+$/;
   try { inboxSeen = new Set(JSON.parse(localStorage.getItem('ledInboxSeen') || '[]')); } catch (e) {}
   try {
@@ -2230,23 +2234,21 @@ const Core = (() => {
     if (tab === 'inbox') { app.show(it.d); lastRGB = null; inboxSeen.add(id); saveSeen(); }
     inboxRender();
   }
-  async function inboxLoad(repo, sha) {
-    const base = 'https://raw.githubusercontent.com/' + repo + '/' + sha + '/';
-    const r = await fetch(base + 'inbox/index.json', { cache: 'no-store' });
-    let list = [];
-    if (r.ok) { const idx = await r.json(); list = (idx && Array.isArray(idx.items) ? idx.items : []).filter(it => it && it.id && it.file).slice(0, 60); }
-    else if (r.status !== 404) throw new Error('liste HTTP ' + r.status);
+  const RAW = 'https://raw.githubusercontent.com/';
+  // Liste girdilerini çizimlere çevirip kutuyu günceller. bust: aynı adresteki eski önbelleği atlatmak için ?v=rev eklenir
+  async function inboxApply(list, base, bust) {
+    list = (Array.isArray(list) ? list : []).filter(it => it && it.id && it.file).slice(0, 60);
     const next = await Promise.all(list.map(async it => {
-      const key = it.file + '@' + (it.rev || sha);
+      const rev = String(it.rev || ''), key = it.file + '@' + (rev || base);
       let d = inboxCache.get(key);
       if (!d) {
         try {
-          const rr = await fetch(base + it.file, { cache: 'no-store' });
+          const rr = await fetch(base + it.file + (bust ? '?v=' + encodeURIComponent(rev || Date.now()) : ''), { cache: 'no-store' });
           if (!rr.ok) throw new Error('HTTP ' + rr.status);
           d = Core.decodeDrawing(await rr.json()); d.thumb = thumbOf(d); inboxCache.set(key, d);
         } catch (e) { d = null; logLine('!', 'gelen kutusu: ' + it.file + ' okunamadı: ' + e.message); }
       }
-      return { id: String(it.id), title: String(it.title || (d && d.title) || it.id), created: String(it.created || ''), d };
+      return { id: String(it.id), file: String(it.file), rev, title: String(it.title || (d && d.title) || it.id), created: String(it.created || ''), d };
     }));
     const oldCur = inboxCurrent();
     inboxItems = next;
@@ -2261,29 +2263,62 @@ const Core = (() => {
     if (tab === 'inbox' && !cur) app.show(null);
     inboxRender();
   }
+  // Kesin yol: commit SHA'sına sabit adres, önbellek yok
+  async function inboxLoadSha(repo, sha) {
+    const base = RAW + repo + '/' + sha + '/';
+    const r = await fetch(base + 'inbox/index.json', { cache: 'no-store' });
+    if (r.status === 404) return inboxApply([], base, false);
+    if (!r.ok) throw new Error('liste HTTP ' + r.status);
+    const idx = await r.json(); await inboxApply(idx && idx.items, base, false);
+  }
+  // Yedek yol: GitHub API'ye sormadan main'deki listeyi okur. Sınırı yok ama GitHub önbelleği yüzünden birkaç dakika gecikebilir.
+  // Eski önbellek listeyi geri almasın diye yalnızca yeni çizim eklendiğinde uygulanır.
+  async function inboxRawCheck(repo) {
+    const base = RAW + repo + '/main/';
+    const r = await fetch(base + 'inbox/index.json?t=' + Date.now(), { cache: 'no-store' });
+    if (r.status === 404) return;
+    if (!r.ok) throw new Error('liste HTTP ' + r.status);
+    const idx = await r.json(), list = (idx && Array.isArray(idx.items) ? idx.items : []).filter(it => it && it.id && it.file);
+    const have = new Set(inboxItems.map(it => it.id));
+    if (!list.some(it => !have.has(String(it.id)))) return;
+    const ids = new Set(list.map(it => String(it.id)));
+    const merged = list.concat(inboxItems.filter(it => !ids.has(it.id)).map(it => ({ id: it.id, file: it.file, rev: it.rev, title: it.title, created: it.created })));
+    merged.sort((a, b) => String(b.created).localeCompare(String(a.created)) || String(b.id).localeCompare(String(a.id)));
+    await inboxApply(merged, base, true);
+  }
   async function inboxCheck(force) {
     if (inboxBusy) return;
-    if (!force && Date.now() < inboxBlockedUntil) return;
     inboxBusy = true;
-    const repo = inboxRepo();
+    const repo = inboxRepo(), now = Date.now(), n = () => inboxItems.length + ' çizim';
+    let note = '';
     try {
-      const headers = { Accept: 'application/vnd.github+json' };
-      if (inboxEtag && inboxSha) headers['If-None-Match'] = inboxEtag;
-      const r = await fetch('https://api.github.com/repos/' + repo + '/git/ref/heads/main', { headers, cache: 'no-store' });
-      const n = inboxItems.length + ' çizim';
-      if (r.status === 304) { inboxStatus('Son bakış ' + clockStr(new Date()) + ' · yeni yok · ' + n); return; }
-      if (r.status === 403 || r.status === 429) {
-        const reset = Number(r.headers.get('x-ratelimit-reset')) * 1000;
-        inboxBlockedUntil = reset > Date.now() ? reset + 1000 : Date.now() + 60000;
-        inboxStatus('GitHub sorgu sınırı doldu. ' + clockStr(new Date(inboxBlockedUntil)) + ' sonra yeniden bakılacak.', true); return;
+      if (now >= inboxBlockedUntil && (force || now >= inboxApiNext)) {
+        const headers = { Accept: 'application/vnd.github+json' };
+        if (inboxToken) headers.Authorization = 'Bearer ' + inboxToken;
+        if (inboxEtag && inboxSha) headers['If-None-Match'] = inboxEtag;
+        const r = await fetch('https://api.github.com/repos/' + repo + '/git/ref/heads/main', { headers, cache: 'no-store' });
+        const rem = Number(r.headers.get('x-ratelimit-remaining')), reset = Number(r.headers.get('x-ratelimit-reset')) * 1000;
+        // kalan hakkı sıfırlanmaya kadar eşit yay, 5 hakkı yedekte tut
+        if (Number.isFinite(rem) && reset > now) inboxApiNext = rem <= 5 ? reset + 1000 : now + Math.max(inboxToken ? 0 : 15000, (reset - now) / (rem - 5));
+        else inboxApiNext = now + (inboxToken ? 0 : 60000);
+        if (r.status === 401) { inboxBlockedUntil = now + 5 * 60000; note = 'GitHub anahtarı geçersiz, yedek yol kullanılıyor'; }
+        else if (r.status === 403 || r.status === 429) { inboxBlockedUntil = reset > now ? reset + 1000 : now + 5 * 60000; }
+        else if (r.status === 404) { inboxStatus('Depo ya da main dalı bulunamadı: ' + repo, true); return; }
+        else if (r.status === 304) { inboxStatus('Son bakış ' + clockStr(new Date()) + ' · yeni yok · ' + n() + (Number.isFinite(rem) ? ' · GitHub hakkı ' + rem : '')); return; }
+        else if (!r.ok) throw new Error('HTTP ' + r.status);
+        else {
+          const etag = r.headers.get('ETag'), j = await r.json(), sha = j && j.object && j.object.sha;
+          if (!sha) throw new Error('SHA okunamadı');
+          if (sha !== inboxSha) await inboxLoadSha(repo, sha);
+          inboxSha = sha; inboxEtag = etag;   // yalnızca başarılı okumadan sonra: hata olursa sonraki yoklamada yeniden denenir
+          inboxStatus('Son bakış ' + clockStr(new Date()) + ' · ' + n() + (Number.isFinite(rem) ? ' · GitHub hakkı ' + rem : ''));
+          return;
+        }
       }
-      if (r.status === 404) { inboxStatus('Depo ya da main dalı bulunamadı: ' + repo, true); return; }
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const etag = r.headers.get('ETag'), j = await r.json(), sha = j && j.object && j.object.sha;
-      if (!sha) throw new Error('SHA okunamadı');
-      if (sha !== inboxSha) await inboxLoad(repo, sha);
-      inboxSha = sha; inboxEtag = etag;   // yalnızca başarılı okumadan sonra: hata olursa sonraki yoklamada yeniden denenir
-      inboxStatus('Son bakış ' + clockStr(new Date()) + ' · ' + inboxItems.length + ' çizim · ' + sha.slice(0, 7));
+      await inboxRawCheck(repo);
+      const back = Math.max(inboxBlockedUntil, inboxApiNext);
+      inboxStatus('Son bakış ' + clockStr(new Date()) + ' · ' + n() + ' · ' + (note || (Date.now() < inboxBlockedUntil ? 'GitHub sınırı doldu, yedek yol (birkaç dk gecikebilir)' : 'ara bakış, yedek yol')) +
+        ' · GitHub\'a ' + clockStr(new Date(back)).slice(0, 5) + '\'te');
     } catch (e) {
       inboxStatus('Bakılamadı (' + (e && e.message ? e.message : e) + '). İnternet bağlantısını kontrol et.', true);
     } finally { inboxBusy = false; }
@@ -2315,9 +2350,15 @@ const Core = (() => {
   });
   $('inboxRepo').addEventListener('change', () => {
     if (!REPO_RE.test($('inboxRepo').value.trim())) { inboxStatus('Depo "kullanıcı/depo" biçiminde olmalı.', true); return; }
-    saveInboxCfg(); inboxSha = null; inboxEtag = null; inboxItems = []; inboxSel = null; inboxBlockedUntil = 0;
+    saveInboxCfg(); inboxSha = null; inboxEtag = null; inboxItems = []; inboxSel = null; inboxBlockedUntil = 0; inboxApiNext = 0;
     if (tab === 'inbox') app.show(null);
     inboxRender(); inboxStatus('Bakılıyor…'); inboxCheck(true).then(inboxSchedule);
+  });
+  $('inboxToken').value = inboxToken;
+  $('inboxToken').addEventListener('change', () => {
+    inboxToken = $('inboxToken').value.trim();
+    try { if (inboxToken) localStorage.setItem('ledInboxToken', inboxToken); else localStorage.removeItem('ledInboxToken'); } catch (e) {}
+    inboxBlockedUntil = 0; inboxApiNext = 0; inboxEtag = null; inboxStatus('Bakılıyor…'); inboxCheck(true).then(inboxSchedule);
   });
   inboxRender();
 
