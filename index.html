@@ -806,7 +806,7 @@ const Core = (() => {
       const m = /^#?([0-9a-f]{6})$/i.exec(String(j.palette[k]));
       if (m) { const n = parseInt(m[1], 16); pal[k] = [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
     }
-    const src = Array.isArray(j.frames) ? j.frames.slice(0, 64) : [];
+    const src = Array.isArray(j.frames) ? j.frames.slice(0, 256) : [];
     if (!src.length) throw new Error('kare yok');
     const frames = src.map(rows => {
       const out = new Uint8Array(w * h * 3);
