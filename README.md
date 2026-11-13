@@ -26,6 +26,6 @@ Claude'a sesli ya da yazılı olarak bir piksel çizim tarif edersin; Claude çi
 
 - `.` sönük piksel; diğer her karakter `palette`'teki bir renk.
 - `frames` birden çok kare içerirse animasyon olur. Süre `delay` (tüm kareler) ya da `delays` (kare başına), milisaniye.
-- En çok 64×64 piksel ve 64 kare.
+- En çok 64×64 piksel ve 256 kare.
 
 Değişiklikten sonra `python3 tools/cizim.py` çalıştır: dosyaları doğrular ve `inbox/index.json`'u yeniden yazar. `python3 tools/cizim.py png --hepsi` PNG önizlemeleri `/tmp/onizleme/` altına çıkarır.

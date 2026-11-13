@@ -30,7 +30,7 @@ import zlib
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIR = os.path.join(ROOT, "inbox", "cizimler")
 INDEX = os.path.join(ROOT, "inbox", "index.json")
-MAX_SIDE, MAX_FRAMES = 64, 64
+MAX_SIDE, MAX_FRAMES = 64, 256
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 
