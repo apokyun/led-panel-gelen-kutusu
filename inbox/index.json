@@ -2,6 +2,16 @@
  "version": 1,
  "items": [
   {
+   "id": "20261114-0239-copadam-dovusu",
+   "title": "Çöp adam dövüşü",
+   "file": "inbox/cizimler/20261114-0239-copadam-dovusu.json",
+   "rev": "95104cd777",
+   "w": 32,
+   "h": 16,
+   "frames": 24,
+   "created": "2026-11-14T02:39:00+03:00"
+  },
+  {
    "id": "20261114-0228-claude-selam",
    "title": "Claude merhaba diyor",
    "file": "inbox/cizimler/20261114-0228-claude-selam.json",
