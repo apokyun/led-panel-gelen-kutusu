@@ -163,6 +163,7 @@ body{background-image:radial-gradient(1200px 500px at 50% -10%,color-mix(in srgb
     <button class="tab" data-tab="space" data-cat="oyun" aria-pressed="false" type="button">Uzay</button>
     <button class="tab" data-tab="car" data-cat="oyun" aria-pressed="false" type="button">Araba</button>
     <button class="tab" data-tab="simon" data-cat="oyun" aria-pressed="false" type="button">Simon</button>
+    <button class="tab" data-tab="microbe" data-cat="oyun" aria-pressed="false" type="button">Mikrop</button>
     <button class="tab" data-tab="lib" data-cat="hafiza" aria-pressed="false" type="button">Kütüphane</button>
     <button class="tab" data-tab="test" data-cat="arac" aria-pressed="false" type="button">Test</button>
   </nav>
@@ -299,6 +300,21 @@ body{background-image:radial-gradient(1200px 500px at 50% -10%,color-mix(in srgb
     <p class="hint">Dikkat: elle komut panele doğrudan gider. Bilmediğin komutu gönderme.</p>
     <textarea class="logbox" id="logBox" readonly aria-label="Günlük"></textarea>
     <div class="row"><button class="chip" id="logCopy" type="button">Günlüğü kopyala</button><button class="chip" id="logClear" type="button">Temizle</button></div>
+  </section>
+
+  <section class="card" id="ctl-microbe" aria-label="Mikrop dünyası" hidden>
+    <p class="hint">Kendi kendine yaşar. Yeşil mikroplar yem yer ve bölünür; her bölünmede rengi, hızı ve görüşü biraz değişir. Kırmızı amipler onları avlar. Önizlemeye dokunarak yem bırakabilirsin.</p>
+    <div class="row">
+      <button class="chip" id="mbFood" type="button">Yem yağdır</button>
+      <button class="chip" id="mbPred" type="button">Avcı ekle</button>
+      <button class="chip" id="mbReset" type="button">Yeniden başlat</button>
+    </div>
+    <div class="field" style="flex:0 0 auto"><label>Hız</label>
+      <div class="swatches" id="mbSpeed">
+        <button class="chip" type="button" data-sp="1" aria-pressed="true">1×</button>
+        <button class="chip" type="button" data-sp="2" aria-pressed="false">2×</button>
+        <button class="chip" type="button" data-sp="4" aria-pressed="false">4×</button>
+      </div></div>
   </section>
 
   <section class="card" id="ctl-inbox" aria-label="Gelen kutusu" hidden>
@@ -1554,8 +1570,112 @@ const Core = (() => {
     };
   }
 
+  /* ---------- Mikrop dünyası (kendi kendine oynar) ---------- */
+  function Microbes(lw, lh) {
+    const MAXP = Math.max(24, Math.round(lw * lh / 12)), MAXR = Math.max(3, Math.round(lw * lh / 110)), MAXF = Math.max(30, Math.round(lw * lh / 8));
+    let prey, preds, food, flashes, gen, born, t, acc, speed = 1, emptyT, era;
+    const wrap = (v, m) => ((v % m) + m) % m;
+    const dxw = (a, b, m) => { let d = b - a; if (d > m / 2) d -= m; if (d < -m / 2) d += m; return d; };
+    const dist2 = (a, b) => { const x = dxw(a.x, b.x, lw), y = dxw(a.y, b.y, lh); return x * x + y * y; };
+    const newPrey = (x, y, g) => ({ x, y, a: Math.random() * 6.283, e: 0.6, hue: g ? g.hue : 90 + Math.random() * 60, sp: g ? g.sp : 3 + Math.random() * 2,
+      se: g ? g.se : 3 + Math.random() * 2, gen: g ? g.gen : 1, age: 0 });
+    const newPred = (x, y) => ({ x, y, a: Math.random() * 6.283, e: 1.2, sp: 5.6, se: 6, age: 0 });
+    function addFood(n, cx, cy, r) {
+      for (let i = 0; i < n && food.length < MAXF * 1.5; i++) {
+        const x = cx === undefined ? Math.random() * lw : wrap(cx + (Math.random() - .5) * 2 * r, lw);
+        const y = cy === undefined ? Math.random() * lh : wrap(cy + (Math.random() - .5) * 2 * r, lh);
+        food.push({ x, y });
+      }
+    }
+    function reset() {
+      prey = []; preds = []; food = []; flashes = []; gen = 1; born = 0; t = 0; acc = 0; emptyT = 0; era = (era || 0) + 1;
+      for (let i = 0; i < 8; i++) prey.push(newPrey(Math.random() * lw, Math.random() * lh));
+      for (let i = 0; i < Math.min(2, MAXR); i++) preds.push(newPred(Math.random() * lw, Math.random() * lh));
+      addFood(Math.round(MAXF * 0.6));
+    }
+    reset();
+    function steer(c, target, dt, turn) {
+      let want;
+      if (target) want = Math.atan2(dxw(c.y, target.y, lh), dxw(c.x, target.x, lw));
+      else want = c.a + (Math.random() - .5) * 2.4;
+      let d = wrap(want - c.a + Math.PI, 6.283) - Math.PI;
+      c.a += clamp(d, -turn * dt, turn * dt);
+    }
+    function nearest(c, list, r2) { let best = null, bd = r2; for (const o of list) { const d = dist2(c, o); if (d < bd) { bd = d; best = o; } } return best; }
+    function tick(dt) {
+      t += dt;
+      for (let k = 0; k < 3; k++) if (Math.random() < dt * (2 + lw * lh / 80) / 3 && food.length < MAXF) addFood(1);
+      // av mikroplar
+      const babies = [];
+      for (const c of prey) {
+        const threat = nearest(c, preds, 9);
+        const f = nearest(c, food, c.se * c.se);
+        if (threat) { steer(c, { x: wrap(2 * c.x - threat.x, lw), y: wrap(2 * c.y - threat.y, lh) }, dt, 6); }
+        else steer(c, f, dt, f ? 5 : 2);
+        const v = c.sp * (threat ? 1.1 : 1);
+        c.x = wrap(c.x + Math.cos(c.a) * v * dt, lw); c.y = wrap(c.y + Math.sin(c.a) * v * dt, lh);
+        c.e -= dt * (0.03 + 0.004 * c.sp * c.sp + 0.004 * c.se); c.age += dt;
+        if (f && dist2(c, f) < 0.8) { food.splice(food.indexOf(f), 1); c.e += 0.35; }
+        if (c.e > 1.3 && prey.length + babies.length < MAXP) {
+          c.e *= 0.5; born++;
+          const m = (v, k, lo, hi) => clamp(v + (Math.random() - .5) * k, lo, hi);
+          const kid = newPrey(c.x, c.y, { hue: wrap(c.hue + (Math.random() - .5) * 40, 360), sp: m(c.sp, 1, 1.5, 8), se: m(c.se, 1, 1.5, 9), gen: c.gen + 1 });
+          kid.e = c.e; kid.a = c.a + Math.PI; babies.push(kid); gen = Math.max(gen, kid.gen);
+          flashes.push({ x: c.x, y: c.y, t: 0.25 });
+        }
+      }
+      prey = prey.filter(c => { if (c.e > 0 && c.age < 90) return true; food.push({ x: c.x, y: c.y }); return false; }).concat(babies);
+      // avcı amipler
+      const pb = [];
+      for (const r of preds) {
+        const target = nearest(r, prey, r.se * r.se);
+        steer(r, target, dt, target ? 3.5 : 1.5);
+        const v = r.sp * (target ? 1 : 0.55);
+        r.x = wrap(r.x + Math.cos(r.a) * v * dt, lw); r.y = wrap(r.y + Math.sin(r.a) * v * dt, lh);
+        r.e -= dt * 0.09; r.age += dt;
+        if (target && dist2(r, target) < 1.4) { target.e = -1; r.e += 0.45; flashes.push({ x: target.x, y: target.y, t: 0.3, red: true }); }
+        if (r.e > 2.4 && preds.length + pb.length < MAXR) { r.e *= 0.5; const k = newPred(r.x, r.y); k.e = r.e; pb.push(k); }
+      }
+      prey = prey.filter(c => c.e > 0);
+      preds = preds.filter(r => r.e > 0 && r.age < 120).concat(pb);
+      // dengeleyiciler: tükenen türü dışarıdan getir
+      if (!preds.length && prey.length > MAXP * 0.4 && Math.random() < dt * 0.25) preds.push(newPred(Math.random() * lw, 0));
+      if (prey.length < 3 && Math.random() < dt * 0.5) prey.push(newPrey(Math.random() * lw, Math.random() * lh));
+      if (!prey.length) { emptyT += dt; if (emptyT > 3) reset(); } else emptyT = 0;
+      for (const fl of flashes) fl.t -= dt;
+      flashes = flashes.filter(fl => fl.t > 0);
+    }
+    return {
+      info: () => 'Mikrop ' + prey.length + ' · Avcı ' + preds.length + ' · Nesil ' + gen,
+      get score() { return gen; },
+      dir(d) { if (d === 'A') addFood(12); },
+      pointer(x, y, phase) { if (phase === 'down') addFood(8, x, y, 1.5); else if (phase === 'move' && Math.random() < 0.4) addFood(1, x, y, 0.8); },
+      feed() { addFood(Math.round(MAXF * 0.5)); },
+      addPredator() { if (preds.length < MAXR + 2) preds.push(newPred(Math.random() * lw, Math.random() * lh)); },
+      reset,
+      setSpeed(v) { speed = v; },
+      step(dt) { acc += dt * speed; while (acc >= 0.04) { acc -= 0.04; tick(0.04); } },
+      render(g) {
+        g.clear();
+        for (const f of food) g.set(f.x, f.y, [25, 110, 35]);
+        for (const c of prey) {
+          const b = clamp(0.45 + c.e * 0.45, 0.35, 1), col = hsv(c.hue, 0.9, b);
+          g.set(c.x - Math.cos(c.a), c.y - Math.sin(c.a), col.map(v => v >> 2));
+          g.set(c.x, c.y, col);
+        }
+        const pulse = 0.75 + 0.25 * Math.sin(t * 6);
+        for (const r of preds) {
+          const x = Math.floor(r.x), y = Math.floor(r.y), c = [Math.round(255 * pulse), 40, 70];
+          g.set(x, y, c); g.set(x + 1, y, c); g.set(x, y + 1, c); g.set(x + 1, y + 1, [140, 20, 40]);
+          if (Math.sin(t * 9 + r.age) > 0) g.set(x + (Math.cos(r.a) > 0 ? 2 : -1), y + (Math.sin(r.a) > 0 ? 1 : 0), [255, 120, 140]);
+        }
+        for (const fl of flashes) g.set(fl.x, fl.y, fl.red ? [255, 60, 60] : [255, 255, 255]);
+      }
+    };
+  }
+
   return { SERVICE, WRITE, NOTIFY, PANELS, frameSizeFor, handshake, brightness, diy, liveFrames, splitWrites, parseNotify, same,
-    SnakeArt, BreakoutArt, Pong, Flappy, Tetris, Dino, Space, Car, Simon,
+    SnakeArt, BreakoutArt, Pong, Flappy, Tetris, Dino, Space, Car, Simon, Microbes,
     crc32, storePackets, gifEncode, bannerFrames, scrollFrames, dither332, clockMode, defaultMode, programList, eraseBuffers,
     logicalSize, mapPixel, toDeviceRGB, hsv, FONT, normalize, textWidth, Gfx, Effect, TextScroll, Draw, Clock, CLOCK_DEFAULTS,
     decodeDrawing, placeDrawing, Inbox };
@@ -1580,10 +1700,12 @@ const Core = (() => {
     dino: { touch: 'tap', pad: true, a: true, noRepeat: ['A', 'U', 'T'], hint: 'Dokun ya da A: zıpla. Aşağı: eğil. Kuşların altından eğilerek geç.' },
     space: { touch: 'drag', pad: true, a: true, hint: 'Parmağını sürükle: gemi gelir ve ateş eder. Oklar ve A de çalışır.' },
     car: { touch: 'swipe', pad: true, noRepeat: ALLKEYS, hint: 'Şerit değiştirmek için kaydır ya da oklara bas.' },
+    microbe: { touch: 'drag' },
     simon: { touch: 'drag', pad: true, noRepeat: ALLKEYS, hint: 'Yanan renklerin sırasını aklında tut, sonra renklere dokun ya da oklara bas.' }
   };
   let textColor = [255, 160, 40], drawColor = [255, 255, 255];
   // Gelen kutusu durumu (aşağıdaki fonksiyonlardan önce tanımlı olmalı)
+  let mbSpeed = 1;
   let drawSeed = null, inboxFit = 'zoom', inboxAuto = true, inboxItems = [], inboxSel = null, inboxSeen = new Set();
   let inboxSha = null, inboxEtag = null, inboxTimer = null, inboxBusy = false, inboxBlockedUntil = 0, inboxApiNext = 0, inboxToken = '';
   try { inboxToken = localStorage.getItem('ledInboxToken') || ''; } catch (e) {}
@@ -1626,6 +1748,7 @@ const Core = (() => {
     else if (tab === 'space') app = Core.Space(lw, lh);
     else if (tab === 'car') app = Core.Car(lw, lh);
     else if (tab === 'simon') app = Core.Simon(lw, lh);
+    else if (tab === 'microbe') { app = Core.Microbes(lw, lh); app.setSpeed(mbSpeed); }
     else if (tab === 'test' || tab === 'lib') app = Core.Effect('plasma', lw, lh);
     else if (tab === 'inbox') { app = Core.Inbox(lw, lh); app.setFit(inboxFit); const it = inboxCurrent(); if (it) app.show(it.d); }
     else if (tab === 'text') app = Core.TextScroll(lw, lh, { text: $('txt').value, color: textColor, speed: Number($('txtSpeed').value) });
@@ -1634,7 +1757,7 @@ const Core = (() => {
     const md = MODES[tab] || {};
     $('ctl-game').hidden = !md.pad; $('btnA').hidden = !md.a;
     $('ctl-clock').hidden = tab !== 'clock'; $('ctl-test').hidden = tab !== 'test'; $('ctl-lib').hidden = tab !== 'lib';
-    $('ctl-text').hidden = tab !== 'text'; $('ctl-inbox').hidden = tab !== 'inbox';
+    $('ctl-text').hidden = tab !== 'text'; $('ctl-inbox').hidden = tab !== 'inbox'; $('ctl-microbe').hidden = tab !== 'microbe';
     $('ctl-draw').hidden = tab !== 'draw';
     $('gameHint').textContent = md.hint || '';
     document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
@@ -2157,7 +2280,7 @@ const Core = (() => {
       const left = Math.max(0, 4 - (performance.now() - t0) / 1000); btn.textContent = 'Kaydediliyor ' + left.toFixed(1) + ' sn';
       if (frames.length >= 40) {
         clearInterval(recTimer); recTimer = null; btn.classList.remove('on'); btn.textContent = '4 sn kaydet';
-        const tn = { inbox: 'gelen', fx: 'efekt', clock: 'saat', text: 'yazı', draw: 'çizim', snake: 'yılan', brick: 'tuğla', pong: 'pong', flappy: 'flappy', tetris: 'tetris', dino: 'dino', space: 'uzay', car: 'araba', simon: 'simon', lib: 'önizleme', test: 'önizleme' }[from] || from;
+        const tn = { microbe: 'mikrop', inbox: 'gelen', fx: 'efekt', clock: 'saat', text: 'yazı', draw: 'çizim', snake: 'yılan', brick: 'tuğla', pong: 'pong', flappy: 'flappy', tetris: 'tetris', dino: 'dino', space: 'uzay', car: 'araba', simon: 'simon', lib: 'önizleme', test: 'önizleme' }[from] || from;
         recClip = { frames, delay: 10, label: 'kayıt: ' + tn };
         libSrc = 'rec'; libCap('Kayıt hazır (' + frames.length + ' kare). Bir yer seçip "Seçili yere kaydet"e bas.'); syncLibUI(); selectTab('lib');
       }
@@ -2361,6 +2484,15 @@ const Core = (() => {
     inboxBlockedUntil = 0; inboxApiNext = 0; inboxEtag = null; inboxStatus('Bakılıyor…'); inboxCheck(true).then(inboxSchedule);
   });
   inboxRender();
+
+  /* ---------- Mikrop dünyası düğmeleri ---------- */
+  $('mbFood').addEventListener('click', () => { if (tab === 'microbe') app.feed(); });
+  $('mbPred').addEventListener('click', () => { if (tab === 'microbe') app.addPredator(); });
+  $('mbReset').addEventListener('click', () => { if (tab === 'microbe') app.reset(); });
+  document.querySelectorAll('#mbSpeed [data-sp]').forEach(b => b.addEventListener('click', () => {
+    mbSpeed = Number(b.dataset.sp); document.querySelectorAll('#mbSpeed [data-sp]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    if (tab === 'microbe') app.setSpeed(mbSpeed);
+  }));
 
   // D-pad (basılı tutunca tekrar eder)
   let rep = null;
