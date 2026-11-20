@@ -2,6 +2,16 @@
  "version": 1,
  "items": [
   {
+   "id": "20261120-1926-muzip-surat",
+   "title": "Muzip surat",
+   "file": "inbox/cizimler/20261120-1926-muzip-surat.json",
+   "rev": "426a63ac43",
+   "w": 32,
+   "h": 16,
+   "frames": 10,
+   "created": "2026-11-20T19:26:00+03:00"
+  },
+  {
    "id": "20261114-0252-sihirli-kiz",
    "title": "Sihirli kız dönüşümü (256 kare)",
    "file": "inbox/cizimler/20261114-0252-sihirli-kiz.json",
