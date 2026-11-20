@@ -1923,7 +1923,7 @@ const Core = (() => {
     if (!m) return;
     if (m.cmd === 0x8001) lastHs = hex(b);
     if (m.cmd === 0x8001 && hsWaiter) { hsWaiter(m); hsWaiter = null; }
-    else if (m.cmd === 0x0000 && ackWaiter) { ackWaiter(m.status === 1 || m.status === 3); ackWaiter = null; }
+    else if (m.cmd === 0x0000) { if (ackWaiter) { ackWaiter(m.status === 1 || m.status === 3); ackWaiter = null; } else onFrameAck(); }
   }
   async function writeRaw(p) {
     for (const part of Core.splitWrites(p)) {
@@ -1934,17 +1934,22 @@ const Core = (() => {
   }
   function send(p) { txChain = txChain.catch(() => {}).then(() => writeRaw(p)); return txChain; }
 
-  // Panel her kareyi onaylar; onayı beklemek taşmayı önler. Bazı bilgisayarlarda (özellikle Windows) onaylar geç
-  // ya da hiç gelmez ve her kare 700 ms bekler: görüntü kasar. Üst üste onay gelmezse onaysız, sabit aralıklı gönderime geç.
-  let ackMiss = 0, noAck = false;
+  // Panel her kareyi onaylar. Eskiden her karenin onayı beklenip sonra yenisi yollanıyordu; bilgisayarlarda Bluetooth
+  // gidiş-dönüşü uzun olduğundan bu saniyede 3-4 kareye düşüyordu. Artık onay beklemeden en çok INFLIGHT kare yolda olabilir.
+  // Onaylar hiç gelmezse (4 kez üst üste) onaysız, sabit aralıklı gönderime geçilir.
+  const INFLIGHT = 2;
+  let ackMiss = 0, noAck = false, inflight = [];
+  function onFrameAck() { if (inflight.length) inflight.shift(); ackMiss = 0; }
   async function sendFrame(rgb) {
     for (const f of Core.liveFrames(rgb, Core.frameSizeFor(panelCode))) {
-      if (noAck) { await send(f); continue; }
-      const ack = new Promise(res => { ackWaiter = res; sleep(ackMiss ? 150 : 400).then(() => res(null)); });
+      while (!noAck && inflight.length >= INFLIGHT) {
+        if (performance.now() - inflight[0] > 400) {
+          inflight.shift();
+          if (++ackMiss >= 4) { noAck = true; inflight = []; logLine('·', 'panel kare onayı göndermiyor, onaysız gönderime geçildi'); }
+        } else await sleep(3);
+      }
       await send(f);
-      if ((await ack) === null) {
-        if (++ackMiss >= 4) { noAck = true; logLine('·', 'panel kare onayı göndermiyor, onaysız gönderime geçildi'); }
-      } else ackMiss = 0;
+      if (!noAck) inflight.push(performance.now());
     }
     if (noAck) await sleep(45);
   }
@@ -1952,7 +1957,7 @@ const Core = (() => {
     if (pumping) return; pumping = true;
     try {
       while (connected) {
-        if (hold) { await sleep(40); continue; }
+        if (hold) { inflight = []; await sleep(40); continue; }
         const rgb = Core.toDeviceRGB(g.buf, lw, lh, rot, W, H), now = performance.now();
         if (lastRGB && Core.same(rgb, lastRGB) && now - lastSend < 1200) { await sleep(25); continue; }
         lastRGB = rgb; lastSend = now;
@@ -1972,7 +1977,7 @@ const Core = (() => {
     el.value = logLines.join('\n'); el.scrollTop = el.scrollHeight;
   }
   function onDisconnected() {
-    connected = false; hold = false; ackWaiter = null; txChain = Promise.resolve(); lastRGB = null; ackMiss = 0; noAck = false;
+    connected = false; hold = false; ackWaiter = null; txChain = Promise.resolve(); lastRGB = null; ackMiss = 0; noAck = false; inflight = [];
     setStatus('Bağlantı kesildi, önizleme çalışıyor');
     $('btnConnect').textContent = 'Panele bağlan'; $('fps').textContent = '';
   }
