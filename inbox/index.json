@@ -2,6 +2,16 @@
  "version": 1,
  "items": [
   {
+   "id": "20261120-1929-kirmizi-sacli-kiz",
+   "title": "Kırmızı saçlı kız",
+   "file": "inbox/cizimler/20261120-1929-kirmizi-sacli-kiz.json",
+   "rev": "0931239abf",
+   "w": 32,
+   "h": 16,
+   "frames": 24,
+   "created": "2026-11-20T19:29:00+03:00"
+  },
+  {
    "id": "20261120-1926-muzip-surat",
    "title": "Muzip surat",
    "file": "inbox/cizimler/20261120-1926-muzip-surat.json",
