@@ -1937,14 +1937,19 @@ const Core = (() => {
   // Panel her kareyi onaylar. Eskiden her karenin onayı beklenip sonra yenisi yollanıyordu; bilgisayarlarda Bluetooth
   // gidiş-dönüşü uzun olduğundan bu saniyede 3-4 kareye düşüyordu. Artık onay beklemeden en çok INFLIGHT kare yolda olabilir.
   // Onaylar hiç gelmezse (4 kez üst üste) onaysız, sabit aralıklı gönderime geçilir.
-  const INFLIGHT = 2;
+  // Pencere kendini ayarlar: onaylar düzenli geldikçe 1 artar (en çok 5), bir onay kaybolunca 1 azalır (en az 1).
+  let INFLIGHT = 2, ackOk = 0;
   let ackMiss = 0, noAck = false, inflight = [];
-  function onFrameAck() { if (inflight.length) inflight.shift(); ackMiss = 0; }
+  function onFrameAck() {
+    if (inflight.length) inflight.shift();
+    ackMiss = 0;
+    if (++ackOk >= 40 && INFLIGHT < 5) { INFLIGHT++; ackOk = 0; }
+  }
   async function sendFrame(rgb) {
     for (const f of Core.liveFrames(rgb, Core.frameSizeFor(panelCode))) {
       while (!noAck && inflight.length >= INFLIGHT) {
         if (performance.now() - inflight[0] > 400) {
-          inflight.shift();
+          inflight.shift(); ackOk = 0; if (INFLIGHT > 1) INFLIGHT--;
           if (++ackMiss >= 4) { noAck = true; inflight = []; logLine('·', 'panel kare onayı göndermiyor, onaysız gönderime geçildi'); }
         } else await sleep(3);
       }
@@ -1977,7 +1982,7 @@ const Core = (() => {
     el.value = logLines.join('\n'); el.scrollTop = el.scrollHeight;
   }
   function onDisconnected() {
-    connected = false; hold = false; ackWaiter = null; txChain = Promise.resolve(); lastRGB = null; ackMiss = 0; noAck = false; inflight = [];
+    connected = false; hold = false; ackWaiter = null; txChain = Promise.resolve(); lastRGB = null; ackMiss = 0; noAck = false; inflight = []; INFLIGHT = 2; ackOk = 0;
     setStatus('Bağlantı kesildi, önizleme çalışıyor');
     $('btnConnect').textContent = 'Panele bağlan'; $('fps').textContent = '';
   }
@@ -2674,7 +2679,7 @@ const Core = (() => {
 
   setInterval(() => {
     $('info').textContent = app.info ? app.info() : '';
-    if (connected) { const f = sent - sentMark; sentMark = sent; $('fps').textContent = f + ' kare/sn'; }
+    if (connected) { const f = sent - sentMark; sentMark = sent; $('fps').textContent = f + ' kare/sn' + (noAck ? ' · onaysız' : ' · yolda ' + INFLIGHT); }
   }, 1000);
   setInterval(() => { if (tab !== 'fx') $('info').textContent = app.info(); }, 200);
 
