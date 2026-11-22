@@ -18,5 +18,6 @@ Bu depo iki şey tutar:
 
 ## Sayfa nasıl okuyor
 
-- `api.github.com/repos/<depo>/git/ref/heads/main` ETag ile 10 sn'de bir yoklanır (304 yanıtları GitHub sınırına sayılmaz).
-- SHA değişince `raw.githubusercontent.com/<depo>/<sha>/inbox/index.json` ve yeni/değişen çizimler SHA'ya sabitlenmiş adresle okunur, böylece önbellek beklenmez.
+- Kesin yol: `api.github.com/repos/<depo>/git/ref/heads/main` ETag ile sorulur. Anahtarsız GitHub saatte 60 soru verir (304'ler de sayılıyor), sayfa kalan hakkı `X-RateLimit-*` başlıklarına bakarak saate yayar. SHA değişince liste ve çizimler `raw.githubusercontent.com/<depo>/<sha>/...` adresinden, önbelleksiz okunur.
+- Yedek yol: aradaki 10 sn'lik yoklamalarda ve sınır dolunca `raw.githubusercontent.com/<depo>/main/inbox/index.json` okunur. Sınırsızdır ama GitHub önbelleği yüzünden birkaç dakika gecikebilir; yalnızca yeni çizim ekler.
+- Kullanıcı isteğe bağlı bir GitHub anahtarı (fine-grained, public read-only) girerse API 10 sn'de bir sorulur.
