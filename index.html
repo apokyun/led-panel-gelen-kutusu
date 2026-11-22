@@ -109,7 +109,7 @@ body{background-image:radial-gradient(1200px 500px at 50% -10%,color-mix(in srgb
     <div class="mark" aria-hidden="true"><i class="c"></i><i class="c"></i><i></i><i class="m"></i><i></i><i class="g"></i><i class="g"></i><i></i><i class="c"></i><i></i><i class="m"></i><i class="m"></i></div>
     <div>
     <h1>LED Panel Atölyesi</h1>
-    <p class="sub">iPixel Color uyumlu LED panele Bluetooth ile animasyon, oyun ve saat gönder.</p>
+    <p class="sub">iPixel, iDotMatrix, LED isim rozeti ve Divoom Pixoo panellere animasyon, oyun ve saat gönder.</p>
     </div>
   </header>
 
@@ -120,6 +120,32 @@ body{background-image:radial-gradient(1200px 500px at 50% -10%,color-mix(in srgb
       <button id="btnAll" class="link" type="button">Panel listede çıkmıyor mu? Tüm cihazları göster</button>
     </div>
     <p id="errBox" class="warn" hidden></p>
+    <div class="row">
+      <div class="field"><label for="drv">Panel türü</label>
+        <select id="drv">
+          <option value="auto">Otomatik (adından tanı)</option>
+          <option value="ipixel">iPixel Color (LED_BLE…)</option>
+          <option value="idm">iDotMatrix (IDM-…)</option>
+          <option value="badge">LED isim rozeti (LSLED)</option>
+          <option value="pixoo">Divoom Pixoo (Wi-Fi)</option>
+        </select></div>
+      <div class="field" id="sizeField" hidden><label for="drvSize">Panel boyutu</label><select id="drvSize"></select></div>
+      <div class="field" id="ipField" hidden><label for="pixooIp">Pixoo IP adresi</label>
+        <input id="pixooIp" type="text" placeholder="192.168.1.50" autocomplete="off" spellcheck="false"></div>
+    </div>
+    <p class="hint" id="drvHint"></p>
+    <div class="row" id="badgeRow" hidden>
+      <div class="field"><label for="badgeMode">Rozet efekti</label>
+        <select id="badgeMode">
+          <option value="auto">Otomatik (yazı kayar, resim sabit)</option>
+          <option value="left">Sola kay</option><option value="right">Sağa kay</option>
+          <option value="up">Yukarı kay</option><option value="down">Aşağı kay</option>
+          <option value="fixed">Sabit</option><option value="snow">Kar</option><option value="laser">Lazer</option>
+        </select></div>
+      <div class="field"><label for="badgeSpeed">Rozet hızı <span id="badgeSpeedVal" style="font-family:var(--f-mono)">4</span></label>
+        <input id="badgeSpeed" type="range" min="0" max="7" value="4"></div>
+      <button id="badgeSend" class="primary" type="button">Rozete gönder</button>
+    </div>
     <div class="row">
       <div class="field">
         <label for="rot">Panel yönü</label>
@@ -1764,8 +1790,72 @@ const Core = (() => {
     };
   }
 
+  /* ---------- Başka panel türleri ---------- */
+  // iDotMatrix (adı IDM- ile başlar): iPixel ile aynı Bluetooth kanalları ve aynı canlı mod/parlaklık komutları,
+  // ama kare PNG olarak gider. Başlık python3-idotmatrix-library ile aynı: <png boyu + parça sayısı:u16> 00 00 <0|2> <png boyu:u32>
+  const IDM_SIZES = { '16x16': [16, 16], '16x32': [32, 16], '32x32': [32, 32], '64x64': [64, 64] };
+  function idmFrames(png, chunk = 4096) {
+    const n = Math.max(1, Math.ceil(png.length / chunk)), out = [], idk = (png.length + n) & 0xffff;
+    for (let i = 0; i < n; i++) {
+      const part = png.subarray(i * chunk, Math.min(png.length, (i + 1) * chunk));
+      const p = new Uint8Array(9 + part.length);
+      p.set([...u16(idk), 0, 0, i === 0 ? 0 : 2, ...u32(png.length)], 0); p.set(part, 9);
+      out.push(p);
+    }
+    return out;
+  }
+  // LED isim rozeti (LSLED / LED Badge Magic): servis 0xFEE0, yazma 0xFEE1, 16 baytlık paketler.
+  // Çerçeve: "wang\0\0", flash, marquee, 8 mod baytı, 8 x u16 (büyük uçlu) 8 piksellik sütun sayısı, ..., zaman, 0x40'tan sonra bitmapler.
+  const BADGE = { SERVICE: 0xfee0, WRITE: 0xfee1, H: 11, MODES: { left: 0, right: 1, up: 2, down: 3, fixed: 4, animation: 5, snow: 6, picture: 7, laser: 8 } };
+  // rgb (w×h) → rozet bitmapi: 11 satır, her 8 sütun 11 bayt, en anlamlı bit solda. Parlak pikseller yanar.
+  function badgeBitmap(rgb, w, h, y0 = 0) {
+    const n = Math.max(1, Math.ceil(w / 8)), out = new Uint8Array(n * 11);
+    for (let c = 0; c < n; c++) for (let r = 0; r < 11; r++) {
+      const y = y0 + r; let b = 0;
+      for (let k = 0; k < 8; k++) {
+        const x = c * 8 + k;
+        if (x < w && y >= 0 && y < h) { const i = (y * w + x) * 3; if (rgb[i] * 0.3 + rgb[i + 1] * 0.59 + rgb[i + 2] * 0.11 > 60) b |= 0x80 >> k; }
+      }
+      out[c * 11 + r] = b;
+    }
+    return out;
+  }
+  // Yazıyı rozet için 2 kat büyük (10 satır) çizer
+  function badgeTextBitmap(text) {
+    text = normalize(text);
+    const tw = Math.max(1, textWidth(text)), g1 = new Gfx(tw, 5); g1.text(text, 0, 0, [255, 255, 255]);
+    const w = tw * 2, rgb = new Uint8Array(w * 11 * 3);
+    for (let y = 0; y < 10; y++) for (let x = 0; x < w; x++) {
+      const i = ((y >> 1) * tw + (x >> 1)) * 3, o = (y * w + x) * 3;
+      rgb[o] = g1.buf[i]; rgb[o + 1] = g1.buf[i + 1]; rgb[o + 2] = g1.buf[i + 2];
+    }
+    return badgeBitmap(rgb, w, 11, 0);
+  }
+  // msgs: [{ bits: Uint8Array(11*n), mode: 'left'|..., speed: 0..7, flash, marquee }] (en çok 8)
+  function badgePacket(msgs, now = new Date()) {
+    msgs = msgs.slice(0, 8);
+    const head = new Uint8Array(64);
+    head.set([0x77, 0x61, 0x6e, 0x67, 0, 0], 0);
+    msgs.forEach((m, i) => {
+      if (m.flash) head[6] |= 1 << i;
+      if (m.marquee) head[7] |= 1 << i;
+      head[8 + i] = ((clamp(m.speed | 0, 0, 7)) << 4) | (BADGE.MODES[m.mode] ?? 0);
+      const n = m.bits.length / 11; head[16 + i * 2] = (n >> 8) & 255; head[17 + i * 2] = n & 255;
+    });
+    head.set([now.getFullYear() % 256, now.getMonth() + 1, now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds()], 0x26);
+    const body = msgs.reduce((a, m) => a + m.bits.length, 0), total = Math.ceil((64 + body) / 16) * 16;
+    const out = new Uint8Array(total); out.set(head, 0);
+    let o = 64; for (const m of msgs) { out.set(m.bits, o); o += m.bits.length; }
+    return out;
+  }
+  // Divoom Pixoo (Wi-Fi): yerel HTTP API, kare base64 ham RGB
+  function b64(bytes) { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
+  function pixooFrame(rgb, size, picId) {
+    return JSON.stringify({ Command: 'Draw/SendHttpGif', PicNum: 1, PicWidth: size, PicOffset: 0, PicID: picId, PicSpeed: 1000, PicData: b64(rgb) });
+  }
+
   return { SERVICE, WRITE, NOTIFY, PANELS, frameSizeFor, handshake, brightness, diy, liveFrames, splitWrites, parseNotify, same,
-    SnakeArt, BreakoutArt, Pong, Flappy, Tetris, Dino, Space, Car, Simon, Microbes, Life,
+    SnakeArt, BreakoutArt, Pong, Flappy, Tetris, Dino, Space, Car, Simon, Microbes, Life, IDM_SIZES, idmFrames, BADGE, badgeBitmap, badgeTextBitmap, badgePacket, pixooFrame,
     crc32, storePackets, gifEncode, bannerFrames, scrollFrames, dither332, clockMode, defaultMode, programList, eraseBuffers,
     logicalSize, mapPixel, toDeviceRGB, hsv, FONT, normalize, textWidth, Gfx, Effect, TextScroll, Draw, Clock, CLOCK_DEFAULTS,
     decodeDrawing, placeDrawing, Inbox };
@@ -1778,6 +1868,7 @@ const Core = (() => {
   const CELL = 24;
   const view = $('view'), ctx = view.getContext('2d');
   let W = 32, H = 16, panelCode = 0x82, rot = 0, lw = 32, lh = 16, g, app;
+  let drv = 'auto', drvActive = 'ipixel', badgeWr = null, pixooIp = '', pixooId = 0;
   let tab = 'fx', fxKind = 'plasma';
   const ALLKEYS = ['L', 'R', 'U', 'D', 'A', 'T'];
   const MODES = {
@@ -1946,7 +2037,8 @@ const Core = (() => {
     if (++ackOk >= 40 && INFLIGHT < 5) { INFLIGHT++; ackOk = 0; }
   }
   async function sendFrame(rgb) {
-    for (const f of Core.liveFrames(rgb, Core.frameSizeFor(panelCode))) {
+    const frames = drvActive === 'idm' ? Core.idmFrames(await pngBytes(rgb, W, H)) : Core.liveFrames(rgb, Core.frameSizeFor(panelCode));
+    for (const f of frames) {
       while (!noAck && inflight.length >= INFLIGHT) {
         if (performance.now() - inflight[0] > 400) {
           inflight.shift(); ackOk = 0; if (INFLIGHT > 1) INFLIGHT--;
@@ -1958,6 +2050,25 @@ const Core = (() => {
     }
     if (noAck) await sleep(45);
   }
+  const pngCanvas = document.createElement('canvas');
+  async function pngBytes(rgb, w, h) {
+    pngCanvas.width = w; pngCanvas.height = h;
+    const c = pngCanvas.getContext('2d'), im = c.createImageData(w, h);
+    for (let i = 0; i < w * h; i++) { im.data[i * 4] = rgb[i * 3]; im.data[i * 4 + 1] = rgb[i * 3 + 1]; im.data[i * 4 + 2] = rgb[i * 3 + 2]; im.data[i * 4 + 3] = 255; }
+    c.putImageData(im, 0, 0);
+    const blob = await new Promise(r => pngCanvas.toBlob(r, 'image/png'));
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+  // Divoom Pixoo: yerel HTTP. Pixoo CORS başlığı göndermediği için 'no-cors' ile yollanır; yanıt okunamaz.
+  function pixooPost(obj) {
+    return fetch('http://' + pixooIp + '/post', { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: typeof obj === 'string' ? obj : JSON.stringify(obj) });
+  }
+  async function pixooSend(rgb) {
+    if (pixooId === 0 || pixooId > 250) { await pixooPost({ Command: 'Draw/ResetHttpGifId' }); pixooId = 1; }
+    const t0 = performance.now();
+    await pixooPost(Core.pixooFrame(rgb, W, pixooId++));
+    const el = performance.now() - t0; if (el < 250) await sleep(250 - el);   // Pixoo saniyede ~4 kareden fazlasını kaldırmıyor
+  }
   async function pump() {
     if (pumping) return; pumping = true;
     try {
@@ -1966,7 +2077,8 @@ const Core = (() => {
         const rgb = Core.toDeviceRGB(g.buf, lw, lh, rot, W, H), now = performance.now();
         if (lastRGB && Core.same(rgb, lastRGB) && now - lastSend < 1200) { await sleep(25); continue; }
         lastRGB = rgb; lastSend = now;
-        await sendFrame(rgb); sent++;
+        if (drvActive === 'pixoo') await pixooSend(rgb); else await sendFrame(rgb);
+        sent++;
         await sleep(8);
       }
     } catch (e) {
@@ -1983,42 +2095,75 @@ const Core = (() => {
   }
   function onDisconnected() {
     connected = false; hold = false; ackWaiter = null; txChain = Promise.resolve(); lastRGB = null; ackMiss = 0; noAck = false; inflight = []; INFLIGHT = 2; ackOk = 0;
+    badgeWr = null; $('badgeRow').hidden = true;
     setStatus('Bağlantı kesildi, önizleme çalışıyor');
     $('btnConnect').textContent = 'Panele bağlan'; $('fps').textContent = '';
   }
 
+  const detectDrv = name => /^IDM-/i.test(name || '') ? 'idm' : /LSLED|badge/i.test(name || '') ? 'badge' : 'ipixel';
+  const DRV_NAME = { ipixel: 'iPixel', idm: 'iDotMatrix', badge: 'LED rozet', pixoo: 'Divoom Pixoo' };
+  function connectedUI(note) {
+    setStatus((drvActive === 'pixoo' ? 'Divoom Pixoo · ' + pixooIp : (dev && dev.name) || DRV_NAME[drvActive]) + ' · ' + W + '×' + H, 'on');
+    $('btnConnect').textContent = 'Bağlantıyı kes';
+    $('badgeRow').hidden = drvActive !== 'badge';
+    showErr(note || '');
+  }
+  async function connectPixoo() {
+    const ip = $('pixooIp').value.trim();
+    if (!/^[\w.-]+(:\d+)?$/.test(ip)) { showErr('Pixoo\'nun IP adresini yaz. Divoom uygulamasında cihaz ayarlarında görünür.'); return; }
+    if (location.protocol === 'https:') { showErr('Tarayıcı https sayfalarından yerel ağa istek göndermiyor. Pixoo için bu sayfayı dosyadan (index.html\'e çift tıklayarak) aç.'); return; }
+    pixooIp = ip; drvActive = 'pixoo'; pixooId = 0; W = H = Number($('drvSize').value) || 64;
+    setStatus('Pixoo\'ya bağlanılıyor…');
+    try { await pixooPost({ Command: 'Channel/SetBrightness', Brightness: Number($('bri').value) }); }
+    catch (e) { setStatus('Bağlanılamadı', 'bad'); showErr('Pixoo\'ya ulaşılamadı (' + e.message + '). IP doğru mu, aynı Wi-Fi ağında mısın?'); return; }
+    connected = true; setup(); connectedUI('Pixoo yanıtları okunamıyor: görüntü gelmiyorsa IP\'yi ve ağı kontrol et.'); sentMark = sent; pump();
+  }
+
   async function connect(all) {
     showErr('');
-    if (!navigator.bluetooth) { setStatus('Web Bluetooth yok', 'bad'); showErr('Bu tarayıcı Web Bluetooth desteklemiyor. Android\'de Chrome ile aç.'); return; }
+    if (drv === 'pixoo') return connectPixoo();
+    if (!navigator.bluetooth) { setStatus('Web Bluetooth yok', 'bad'); showErr('Bu tarayıcı Web Bluetooth desteklemiyor. Android\'de, Windows\'ta ya da Mac\'te Chrome veya Edge ile aç.'); return; }
     try {
       setStatus('Panel aranıyor…');
-      const optional = [Core.SERVICE];
+      const optional = [Core.SERVICE, Core.BADGE.SERVICE];
+      const prefixes = { auto: ['LED_BLE', 'IDM-', 'LSLED', 'LED Badge'], ipixel: ['LED_BLE'], idm: ['IDM-'], badge: ['LSLED', 'LED Badge'] }[drv];
       const opts = all ? { acceptAllDevices: true, optionalServices: optional }
-                       : { filters: [{ namePrefix: 'LED_BLE' }], optionalServices: optional };
+                       : { filters: prefixes.map(p => ({ namePrefix: p })), optionalServices: optional };
       dev = await navigator.bluetooth.requestDevice(opts);
       dev.addEventListener('gattserverdisconnected', onDisconnected);
+      drvActive = drv === 'auto' ? detectDrv(dev.name) : drv;
       setStatus('Bağlanıyor…');
       const server = await dev.gatt.connect();
+      if (drvActive === 'badge') {
+        const bs = await server.getPrimaryService(Core.BADGE.SERVICE);
+        badgeWr = await bs.getCharacteristic(Core.BADGE.WRITE); wr = null;
+        W = 44; H = 11; connected = true; setup();
+        connectedUI('Rozette canlı görüntü yok: hazırlayıp "Rozete gönder"e bas. Rozet Bluetooth modunda değilse yan tuşuna bir kez bas.');
+        return;
+      }
       const svc = await server.getPrimaryService(Core.SERVICE);
       wr = await svc.getCharacteristic(Core.WRITE); nt = await svc.getCharacteristic(Core.NOTIFY);
       await nt.startNotifications();
       nt.addEventListener('characteristicvaluechanged', onNotify);
-      const hs = new Promise(res => { hsWaiter = res; setTimeout(() => res(null), 2500); });
-      await send(Core.handshake(new Date()));
-      const info = await hs;
       let note = '';
-      if (info) {
-        panelCode = info.panel;
-        const d = Core.PANELS[info.panel];
-        if (d) { W = d[0]; H = d[1]; } else note = 'Panel kodu 0x' + info.panel.toString(16) + ' tanınmadı, ' + W + '×' + H + ' varsayıldı.';
-        if (info.pin) note = 'Panelde parola açık. Uygulamadan parolayı kapatman gerekebilir.';
-      } else note = 'Panel el sıkışmaya yanıt vermedi, ' + W + '×' + H + ' varsayıldı.';
+      if (drvActive === 'ipixel') {
+        const hs = new Promise(res => { hsWaiter = res; setTimeout(() => res(null), 2500); });
+        await send(Core.handshake(new Date()));
+        const info = await hs;
+        if (info) {
+          panelCode = info.panel;
+          const d = Core.PANELS[info.panel];
+          if (d) { W = d[0]; H = d[1]; } else note = 'Panel kodu 0x' + info.panel.toString(16) + ' tanınmadı, ' + W + '×' + H + ' varsayıldı.';
+          if (info.pin) note = 'Panelde parola açık. Uygulamadan parolayı kapatman gerekebilir.';
+        } else note = 'Panel el sıkışmaya yanıt vermedi, ' + W + '×' + H + ' varsayıldı.';
+      } else {
+        [W, H] = Core.IDM_SIZES[$('drvSize').value] || [32, 32];
+        await send(Core.brightness(Number($('bri').value)));
+        note = 'iDotMatrix: boyut yanlışsa bağlantıyı kes, "Panel boyutu"nu değiştir. Panel hafızası, Test ve dahili saat yalnızca iPixel\'de var.';
+      }
       connected = true;
       await send(Core.diy(1));
-      setup();
-      setStatus((dev.name || 'Panel') + ' · ' + W + '×' + H, 'on');
-      $('btnConnect').textContent = 'Bağlantıyı kes';
-      showErr(note);
+      setup(); connectedUI(note);
       sentMark = sent; pump();
     } catch (e) {
       connected = false;
@@ -2029,6 +2174,7 @@ const Core = (() => {
     }
   }
   async function disconnect() {
+    if (drvActive === 'pixoo') { connected = false; onDisconnected(); return; }
     try { connected = false; await sleep(60); if (wr) await wr.writeValueWithResponse(Core.diy(0)); } catch (e) {}
     try { if (dev && dev.gatt.connected) dev.gatt.disconnect(); } catch (e) {}
     onDisconnected();
@@ -2037,6 +2183,49 @@ const Core = (() => {
   /* --- arayüz bağlantıları --- */
   $('btnConnect').addEventListener('click', () => connected ? disconnect() : connect(false));
   $('btnAll').addEventListener('click', () => { if (!connected) connect(true); });
+
+  /* --- panel türü --- */
+  const DRV_HINT = {
+    auto: 'Bağlanırken cihazın adına bakar: LED_BLE → iPixel, IDM- → iDotMatrix, LSLED → isim rozeti.',
+    ipixel: 'iPixel Color uyumlu paneller. Boyut panelden okunur; panel hafızası, test ve dahili saat yalnızca bunlarda var.',
+    idm: 'iDotMatrix panelleri boyutunu söylemiyor, aşağıdan seç. Kareler PNG olarak gider.',
+    badge: 'LED isim rozetinde canlı görüntü yok. Rozeti Bluetooth moduna al (yan tuşa bir kez bas), bağlan, sonra "Rozete gönder". Yazı sekmesindeki yazı kayan yazı olarak, diğer sekmeler o anki görüntü olarak gider.',
+    pixoo: 'Divoom Pixoo-64/32/16 Wi-Fi ile çalışır, aynı ağda olmalısın. Sayfayı dosyadan aç; https adreslerinden tarayıcı yerel ağa istek göndermez. Ditoo, Timebox ve eski Bluetooth Pixoo klasik Bluetooth kullanır, tarayıcıdan bağlanılamaz.'
+  };
+  function syncDrvUI() {
+    $('drvHint').textContent = DRV_HINT[drv];
+    const sizes = drv === 'idm' ? [['32x32', '32×32'], ['16x16', '16×16'], ['16x32', '32×16'], ['64x64', '64×64']]
+                : drv === 'pixoo' ? [['64', '64×64'], ['32', '32×32'], ['16', '16×16']] : null;
+    $('sizeField').hidden = !sizes; $('ipField').hidden = drv !== 'pixoo';
+    if (sizes) {
+      const keep = $('drvSize').value;
+      $('drvSize').innerHTML = sizes.map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
+      if (sizes.some(x => x[0] === keep)) $('drvSize').value = keep;
+    }
+  }
+  try {
+    const j = JSON.parse(localStorage.getItem('ledDrv') || 'null');
+    if (j) { if (DRV_HINT[j.drv]) drv = j.drv; if (typeof j.ip === 'string') $('pixooIp').value = j.ip; $('drv').value = drv; syncDrvUI(); if (j.size) $('drvSize').value = j.size; }
+  } catch (e) {}
+  const saveDrv = () => { try { localStorage.setItem('ledDrv', JSON.stringify({ drv, size: $('drvSize').value, ip: $('pixooIp').value.trim() })); } catch (e) {} };
+  $('drv').addEventListener('change', e => { drv = e.target.value; syncDrvUI(); saveDrv(); if (connected) showErr('Panel türü bir sonraki bağlantıda geçerli olur.'); });
+  $('drvSize').addEventListener('change', saveDrv); $('pixooIp').addEventListener('change', saveDrv);
+  syncDrvUI();
+  $('badgeSpeed').addEventListener('input', e => { $('badgeSpeedVal').textContent = e.target.value; });
+  $('badgeSend').addEventListener('click', async () => {
+    if (!connected || drvActive !== 'badge' || !badgeWr) { showErr('Önce rozete bağlan.'); return; }
+    const sel = $('badgeMode').value, speed = Number($('badgeSpeed').value), isText = tab === 'text';
+    const bits = isText ? Core.badgeTextBitmap($('txt').value) : Core.badgeBitmap(Core.toDeviceRGB(g.buf, lw, lh, rot, W, H), W, H);
+    const pk = Core.badgePacket([{ bits, mode: sel === 'auto' ? (isText ? 'left' : 'fixed') : sel, speed }]);
+    try {
+      setStatus('Rozete gönderiliyor…');
+      for (let o = 0; o < pk.length; o += 16) {
+        const part = pk.subarray(o, o + 16);
+        if (badgeWr.writeValueWithResponse) await badgeWr.writeValueWithResponse(part); else await badgeWr.writeValue(part);
+      }
+      connectedUI('Gönderildi (' + pk.length + ' bayt). Rozet yeni içeriği birkaç saniye içinde gösterir.');
+    } catch (e) { connectedUI(); showErr('Rozete gönderilemedi: ' + (e && e.message ? e.message : e)); }
+  });
   $('rot').addEventListener('change', e => {
     rot = Number(e.target.value); try { localStorage.setItem('ledRot', String(rot)); } catch (x) {}
     setup(); lastRGB = null;
@@ -2044,7 +2233,12 @@ const Core = (() => {
   let briTimer = null;
   $('bri').addEventListener('input', e => {
     $('briVal').textContent = e.target.value; clearTimeout(briTimer);
-    briTimer = setTimeout(() => { if (connected) send(Core.brightness(Number(e.target.value))).catch(() => {}); }, 150);
+    briTimer = setTimeout(() => {
+      if (!connected) return;
+      const v = Number(e.target.value);
+      if (drvActive === 'pixoo') pixooPost({ Command: 'Channel/SetBrightness', Brightness: v }).catch(() => {});
+      else if (drvActive !== 'badge') send(Core.brightness(v)).catch(() => {});
+    }, 150);
   });
   const TABCAT = {};
   document.querySelectorAll('.tab').forEach(b => { TABCAT[b.dataset.tab] = b.dataset.cat; });
@@ -2132,9 +2326,12 @@ const Core = (() => {
       rxHooks.push(h); setTimeout(() => { done(); res(null); }, ms);
     });
   }
-  async function enterTest() { hold = true; await sleep(800); await tx('canlı mod kapat', Core.diy(0)); await sleep(250); }
+  async function enterTest() {
+    if (drvActive !== 'ipixel') throw new Error('Bu özellik yalnızca iPixel panellerde çalışır.');
+    hold = true; await sleep(800); await tx('canlı mod kapat', Core.diy(0)); await sleep(250); }
   async function leaveTest() { await tx('canlı mod aç', Core.diy(1)); hold = false; lastRGB = null; }
   async function storeSlot(type, data, slot, label) {
+    if (drvActive !== 'ipixel') throw new Error('Panel hafızası yalnızca iPixel panellerde var.');
     let last = null, ok = true;
     for (const pk of Core.storePackets(type, data, slot)) {
       const w = waitFor(b => b.length >= 5 && (b[2] | (b[3] << 8)) === type, 4000);
